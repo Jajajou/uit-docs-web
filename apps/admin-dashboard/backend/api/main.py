@@ -1,0 +1,96 @@
+"""Admin dashboard API - contract-aligned /web BFF."""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from api.config import settings
+from api.errors import ApiServiceError, build_error_response
+from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, upload
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    yield
+
+
+app = FastAPI(
+    title="UIT Admin Dashboard API",
+    description="Contract-aligned BFF for the /web workspace.",
+    version="0.2.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["x-request-id"] = request_id
+    return response
+
+
+@app.exception_handler(ApiServiceError)
+async def api_service_error_handler(request: Request, exc: ApiServiceError):
+    return build_error_response(request, exc)
+
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(request: Request, exc: Exception):
+    response = JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "unhandled_error",
+                "message": str(exc),
+                "status": 500,
+                "requestId": getattr(request.state, "request_id", None),
+                "details": None,
+            }
+        },
+    )
+    if getattr(request.state, "request_id", None):
+        response.headers["x-request-id"] = request.state.request_id
+    return response
+
+
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(upload.router, prefix="/api/uploads", tags=["Uploads"])
+app.include_router(upload.router, prefix="/api/upload", tags=["Legacy Upload"])
+app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(submissions.router, prefix="/api/submissions", tags=["Submissions"])
+app.include_router(reviews.router, prefix="/api/reviews", tags=["Reviews"])
+app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "admin-dashboard-api", "version": "0.2.0"}
+
+
+@app.get("/")
+async def root():
+    return {
+        "message": "UIT Admin Dashboard API",
+        "docs": "/docs",
+        "version": "0.2.0",
+    }

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-fixed-dim": "#b4c5ff",
+              "on-background": "#191c1d",
+              "on-tertiary-container": "#ffede6",
+              "error-container": "#ffdad6",
+              "primary-fixed": "#dbe1ff",
+              "inverse-surface": "#2e3132",
+              "secondary-fixed": "#dbe1ff",
+              "surface-container-high": "#e7e8e9",
+              "on-error-container": "#93000a",
+              "on-primary-container": "#eeefff",
+              "surface-container": "#edeeef",
+              "surface-dim": "#d9dadb",
+              "on-surface": "#191c1d",
+              "surface-container-lowest": "#ffffff",
+              "on-secondary-fixed": "#00174a",
+              "secondary-container": "#acbffe",
+              "surface-variant": "#e1e3e4",
+              "primary-container": "#2563eb",
+              "outline": "#737686",
+              "on-error": "#ffffff",
+              "tertiary": "#943700",
+              "on-primary-fixed": "#00174b",
+              "on-primary-fixed-variant": "#003ea8",
+              "inverse-primary": "#b4c5ff",
+              "surface": "#f8f9fa",
+              "outline-variant": "#c3c6d7",
+              "on-secondary-container": "#394c84",
+              "secondary": "#495c94",
+              "primary": "#004ac6",
+              "on-surface-variant": "#434655",
+              "tertiary-container": "#bc4800",
+              "surface-container-highest": "#e1e3e4",
+              "surface-tint": "#0053db",
+              "on-tertiary-fixed": "#360f00",
+              "surface-bright": "#f8f9fa",
+              "surface-container-low": "#f3f4f5",
+              "on-tertiary": "#ffffff",
+              "secondary-fixed-dim": "#b3c5ff",
+              "tertiary-fixed": "#ffdbcd",
+              "on-tertiary-fixed-variant": "#7d2d00",
+              "on-secondary-fixed-variant": "#31447b",
+              "inverse-on-surface": "#f0f1f2",
+              "tertiary-fixed-dim": "#ffb596",
+              "on-secondary": "#ffffff",
+              "background": "#f8f9fa",
+              "on-primary": "#ffffff",
+              "error": "#ba1a1a"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            color: #191c1d;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 bg-[#f8f9fa] dark:bg-slate-950 flex justify-between items-center px-6 py-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-700 dark:text-blue-500 text-2xl">school</span>
+<h1 class="text-xl font-bold tracking-tighter text-blue-700 dark:text-blue-500">UIT_DOCS_AGENT</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors p-2 rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined text-slate-500 dark:text-slate-400">notifications</span>
+</button>
+</div>
+</header>
+<main class="px-6 py-4 space-y-8">
+<!-- Hero Section -->
+<section class="space-y-2">
+<p class="text-on-surface-variant font-label text-sm font-medium tracking-wide uppercase">System Overview</p>
+<h2 class="text-3xl font-extrabold tracking-tight text-on-surface">Knowledge Architecture</h2>
+</section>
+<!-- KPI Grid 2x2 -->
+<section class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-col justify-between h-32 relative overflow-hidden group active:scale-95 duration-150 transition-transform">
+<div class="z-10">
+<span class="material-symbols-outlined text-primary mb-2">article</span>
+<p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Documents</p>
+</div>
+<p class="text-2xl font-bold text-on-surface z-10">1,284</p>
+<div class="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">article</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-col justify-between h-32 relative overflow-hidden group active:scale-95 duration-150 transition-transform">
+<div class="z-10">
+<span class="material-symbols-outlined text-tertiary mb-2">bolt</span>
+<p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Avg Latency</p>
+</div>
+<p class="text-2xl font-bold text-on-surface z-10">1.2s</p>
+<div class="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-col justify-between h-32 relative overflow-hidden group active:scale-95 duration-150 transition-transform">
+<div class="z-10">
+<span class="material-symbols-outlined text-primary-container mb-2">database</span>
+<p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Index Size</p>
+</div>
+<p class="text-2xl font-bold text-on-surface z-10">4.2 GB</p>
+<div class="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">database</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-xl flex flex-col justify-between h-32 relative overflow-hidden group active:scale-95 duration-150 transition-transform">
+<div class="z-10">
+<span class="material-symbols-outlined text-green-600 mb-2">check_circle</span>
+<p class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Accuracy</p>
+</div>
+<p class="text-2xl font-bold text-on-surface z-10">98.4%</p>
+<div class="absolute -right-2 -bottom-2 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+</section>
+<!-- AI Query Focus Area (Intentional Asymmetry) -->
+<section class="bg-gradient-to-br from-primary to-primary-container p-6 rounded-xl text-white space-y-4 shadow-lg">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<h3 class="text-xl font-bold leading-tight">Neural Intelligence <br/>Deployment</h3>
+<p class="text-blue-100 text-sm opacity-90">Last sync: 4 minutes ago</p>
+</div>
+<span class="material-symbols-outlined text-3xl opacity-50">auto_awesome</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+<div class="h-full bg-white w-3/4 rounded-full"></div>
+</div>
+<span class="text-xs font-bold">75%</span>
+</div>
+</section>
+<!-- Recent Activity Card Stack -->
+<section class="space-y-4">
+<div class="flex justify-between items-end">
+<h3 class="text-lg font-bold text-on-surface">Recent Activity</h3>
+<button class="text-primary text-sm font-semibold hover:underline">View All</button>
+</div>
+<div class="space-y-3">
+<!-- Activity Card 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl space-y-3 transition-all hover:translate-x-1 active:scale-[0.98]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">picture_as_pdf</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface leading-none mb-1">Q4_Report_Draft.pdf</h4>
+<p class="text-xs text-on-surface-variant">PDF Document • 2h ago</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded-md bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-wider">Indexed</span>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant uppercase font-medium">Confidence Score</p>
+<div class="flex items-center gap-2 mt-1">
+<div class="w-24 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[92%]"></div>
+</div>
+<span class="text-xs font-bold text-tertiary">92%</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface">
+<span class="material-symbols-outlined text-sm">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Activity Card 2 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl space-y-3 transition-all hover:translate-x-1 active:scale-[0.98]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">description</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface leading-none mb-1">Product_Specs_v2.docx</h4>
+<p class="text-xs text-on-surface-variant">Word Doc • 5h ago</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded-md bg-yellow-100 text-yellow-700 text-[10px] font-bold uppercase tracking-wider">Processing</span>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant uppercase font-medium">Confidence Score</p>
+<div class="flex items-center gap-2 mt-1">
+<div class="w-24 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[45%]"></div>
+</div>
+<span class="text-xs font-bold text-tertiary">45%</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface">
+<span class="material-symbols-outlined text-sm">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Activity Card 3 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl space-y-3 transition-all hover:translate-x-1 active:scale-[0.98]">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">table_chart</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface leading-none mb-1">Financials_Oct23.csv</h4>
+<p class="text-xs text-on-surface-variant">Dataset • 1d ago</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded-md bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-wider">Indexed</span>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex flex-col">
+<p class="text-[10px] text-on-surface-variant uppercase font-medium">Confidence Score</p>
+<div class="flex items-center gap-2 mt-1">
+<div class="w-24 h-1.5 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[98%]"></div>
+</div>
+<span class="text-xs font-bold text-tertiary">98%</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface">
+<span class="material-symbols-outlined text-sm">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-[#f8f9fa]/80 dark:bg-slate-950/80 backdrop-blur-xl border-t border-slate-200/20 dark:border-slate-800/20 shadow-[0_-4px_24px_rgba(0,0,0,0.04)] rounded-t-2xl">
+<a class="flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-xl px-4 py-1 active:scale-90 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-4 py-1 hover:text-blue-600 dark:hover:text-blue-400 active:scale-90 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined">library_books</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Knowledge</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-4 py-1 hover:text-blue-600 dark:hover:text-blue-400 active:scale-90 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">AI</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 px-4 py-1 hover:text-blue-600 dark:hover:text-blue-400 active:scale-90 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Inter'] text-[11px] font-medium tracking-wide uppercase mt-1">Settings</span>
+</a>
+</nav>
+<!-- FAB (Suppressed on Dashboard as it's not the primary action here, but included for complete ecosystem look if needed elsewhere) -->
+<!-- Hidden for Dashboard Focus -->
+</body></html>

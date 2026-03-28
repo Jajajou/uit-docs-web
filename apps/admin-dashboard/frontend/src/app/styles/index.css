@@ -1,0 +1,276 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap") layer(base);
+
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Typography */
+  --font-outfit: "Outfit", sans-serif;
+
+  --text-title-sm: 1.875rem;
+  /* 30px */
+  --text-title-sm--line-height: 2.375rem;
+  /* 38px */
+  --text-theme-sm: 0.875rem;
+  /* 14px */
+  --text-theme-sm--line-height: 1.25rem;
+  /* 20px */
+  --text-theme-xs: 0.75rem;
+  /* 12px */
+  --text-theme-xs--line-height: 1.125rem;
+  /* 18px */
+
+  /* Colors - Premium Gray Scale (Cooler/Tech) */
+  --color-white: #ffffff;
+  --color-black: #0f172a;
+  /* Slate 900 based */
+
+  /* Brand Colors (Electric Blue - Refined) */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #465fff;
+  /* Kept core brand color */
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Gray Colors (Slate-ish for premium feel) */
+  --color-gray-25: #f8fafc;
+  --color-gray-50: #f1f5f9;
+  --color-gray-100: #e2e8f0;
+  --color-gray-200: #cbd5e1;
+  --color-gray-300: #94a3b8;
+  --color-gray-400: #64748b;
+  --color-gray-500: #475569;
+  --color-gray-600: #334155;
+  --color-gray-700: #1e293b;
+  --color-gray-800: #0f172a;
+  --color-gray-900: #020617;
+  --color-gray-dark: #0f172a;
+
+  /* Semantic Colors */
+  --color-success-50: #f0fdf4;
+  --color-success-300: #86efac;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-950: #052e16;
+
+  --color-error-50: #fef2f2;
+  --color-error-200: #fecaca;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-950: #450a0a;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-200: #fde68a;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-950: #451a03;
+
+  /* Shadows - Soft & Multi-layered */
+  --shadow-theme-xs: 0px 1px 2px 0px rgba(15, 23, 42, 0.05);
+  --shadow-theme-sm: 0px 1px 3px 0px rgba(15, 23, 42, 0.08), 0px 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-theme-md: 0px 4px 6px -1px rgba(15, 23, 42, 0.08), 0px 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-theme-lg: 0px 10px 15px -3px rgba(15, 23, 42, 0.08), 0px 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-theme-xl: 0px 20px 25px -5px rgba(15, 23, 42, 0.08), 0px 8px 10px -6px rgba(15, 23, 42, 0.04);
+
+  /* Glassmorphism Variables */
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-blur: 12px;
+}
+
+/* Base Layer */
+@layer base {
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--color-gray-50);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  table {
+    width: 100%;
+  }
+
+  thead {
+    background-color: var(--color-gray-50);
+  }
+
+  th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 1rem;
+    font-size: 0.875rem;
+    color: var(--color-gray-700);
+    border-bottom: 1px solid var(--color-gray-200);
+  }
+
+  tbody tr:hover {
+    background-color: var(--color-gray-50);
+  }
+
+  input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--color-gray-200);
+    border-radius: 0.25rem;
+    cursor: pointer;
+    accent-color: var(--color-brand-500);
+  }
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow-theme-sm);
+}
+
+/* Scrollbar Styles - Premium Thin */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dark mode body */
+.dark body {
+  background-color: var(--color-gray-900);
+}
+
+.dark thead {
+  background-color: var(--color-gray-800);
+}
+
+.dark th {
+  color: var(--color-gray-400);
+}
+
+.dark td {
+  color: var(--color-gray-300);
+  border-bottom-color: var(--color-gray-800);
+}
+
+.dark tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.dark input[type="checkbox"] {
+  border-color: var(--color-gray-700);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-gray-700);
+}

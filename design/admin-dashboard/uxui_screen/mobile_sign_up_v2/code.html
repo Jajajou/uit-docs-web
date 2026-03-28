@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up | UIT_DOCS_AGENT</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed": "#360f00",
+              "outline": "#737686",
+              "on-tertiary-container": "#ffede6",
+              "surface-container-lowest": "#ffffff",
+              "secondary": "#495c94",
+              "surface-variant": "#e1e3e4",
+              "on-error": "#ffffff",
+              "surface-container-high": "#e7e8e9",
+              "primary-fixed": "#dbe1ff",
+              "surface": "#f8f9fa",
+              "secondary-fixed": "#dbe1ff",
+              "tertiary-fixed": "#ffdbcd",
+              "on-secondary-fixed-variant": "#31447b",
+              "on-background": "#191c1d",
+              "on-primary-fixed-variant": "#003ea8",
+              "secondary-fixed-dim": "#b3c5ff",
+              "on-surface": "#191c1d",
+              "secondary-container": "#acbffe",
+              "on-error-container": "#93000a",
+              "tertiary": "#943700",
+              "inverse-primary": "#b4c5ff",
+              "background": "#f8f9fa",
+              "tertiary-fixed-dim": "#ffb596",
+              "surface-tint": "#0053db",
+              "primary-fixed-dim": "#b4c5ff",
+              "primary": "#004ac6",
+              "inverse-surface": "#2e3132",
+              "on-secondary-container": "#394c84",
+              "inverse-on-surface": "#f0f1f2",
+              "surface-bright": "#f8f9fa",
+              "on-secondary-fixed": "#00174a",
+              "error-container": "#ffdad6",
+              "on-primary-container": "#eeefff",
+              "on-secondary": "#ffffff",
+              "on-surface-variant": "#434655",
+              "primary-container": "#2563eb",
+              "on-tertiary": "#ffffff",
+              "on-primary": "#ffffff",
+              "error": "#ba1a1a",
+              "on-primary-fixed": "#00174b",
+              "surface-container": "#edeeef",
+              "surface-dim": "#d9dadb",
+              "tertiary-container": "#bc4800",
+              "surface-container-low": "#f3f4f5",
+              "on-tertiary-fixed-variant": "#7d2d00",
+              "surface-container-highest": "#e1e3e4",
+              "outline-variant": "#c3c6d7"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+            color: #191c1d;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col items-center justify-start overflow-x-hidden">
+<!-- Top Navigation Suppression (Transactional Page) -->
+<header class="w-full px-6 py-8 flex items-center justify-between sticky top-0 bg-surface/80 backdrop-blur-md z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="school">school</span>
+<span class="text-xl font-bold tracking-tighter text-blue-700">UIT_DOCS_AGENT</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</header>
+<main class="w-full max-w-md px-6 pb-20">
+<!-- Value Proposition Section -->
+<section class="mt-4 mb-10 text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-semibold mb-4 tracking-wide">
+<span class="material-symbols-outlined text-[14px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+                ACADEMIC ACCESS ONLY
+            </div>
+<h1 class="text-3xl font-extrabold tracking-tight text-on-surface leading-tight mb-3">
+                Join the premium intelligence ecosystem
+            </h1>
+<p class="text-on-surface-variant text-base leading-relaxed">
+                Connect your institutional credentials to unlock advanced RAG processing and scholarly synthesis tools.
+            </p>
+</section>
+<!-- Registration Form Card -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0_12px_32px_-4px_rgba(25,28,29,0.04)] relative overflow-hidden">
+<!-- Decorative Accent -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+<form class="space-y-6 relative">
+<!-- Name Field -->
+<div class="space-y-2">
+<label class="text-[12px] font-semibold text-on-surface-variant uppercase tracking-wider" for="name">Full Name</label>
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface placeholder:text-outline/50 focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all" id="name" placeholder="Dr. Julian Vane" type="text"/>
+</div>
+</div>
+<!-- Email Field -->
+<div class="space-y-2">
+<label class="text-[12px] font-semibold text-on-surface-variant uppercase tracking-wider" for="email">Institutional Email</label>
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface placeholder:text-outline/50 focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all" id="email" placeholder="name@university.edu" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-2">
+<label class="text-[12px] font-semibold text-on-surface-variant uppercase tracking-wider" for="password">Secure Password</label>
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface placeholder:text-outline/50 focus:ring-2 focus:ring-primary focus:bg-surface-bright transition-all" id="password" placeholder="••••••••••••" type="password"/>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-outline/60 text-[20px] cursor-pointer" data-icon="visibility">visibility</span>
+</div>
+</div>
+<!-- Password Strength Indicator -->
+<div class="space-y-3 pt-1">
+<div class="flex justify-between items-center text-[11px] font-medium uppercase tracking-widest text-on-surface-variant">
+<span>Security Rating</span>
+<span class="text-tertiary">Calculated High</span>
+</div>
+<div class="flex gap-1.5 h-1.5 w-full">
+<div class="flex-1 bg-tertiary rounded-full"></div>
+<div class="flex-1 bg-tertiary rounded-full"></div>
+<div class="flex-1 bg-tertiary rounded-full"></div>
+<div class="flex-1 bg-surface-container-highest rounded-full"></div>
+</div>
+<p class="text-[11px] text-on-surface-variant italic leading-relaxed">
+                        Tip: Include symbols and unique academic identifiers.
+                    </p>
+</div>
+<!-- Submit Action -->
+<div class="pt-4">
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-white font-bold py-4 rounded-lg shadow-lg active:scale-95 transition-transform duration-150 flex items-center justify-center gap-2" type="submit">
+                        Create Account
+                        <span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</form>
+</div>
+<!-- Footnote & Redirection -->
+<footer class="mt-10 space-y-8 text-center">
+<p class="text-on-surface-variant text-sm">
+                Already have an account? 
+                <a class="text-primary font-bold hover:underline decoration-2 underline-offset-4" href="#">Sign In</a>
+</p>
+<!-- Security Badges -->
+<div class="flex items-center justify-center gap-6 pt-6 grayscale opacity-60">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[24px]" data-icon="encrypted">encrypted</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">AES-256</span>
+</div>
+<div class="flex flex-col items-center gap-1 border-x border-outline-variant/20 px-6">
+<span class="material-symbols-outlined text-[24px]" data-icon="security">security</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">SAML 2.0</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[24px]" data-icon="gpp_good">gpp_good</span>
+<span class="text-[9px] font-bold uppercase tracking-tighter">GDPR-Ready</span>
+</div>
+</div>
+<p class="text-[11px] text-outline leading-relaxed max-w-[280px] mx-auto">
+                By creating an account, you agree to our <a class="underline" href="#">Terms of Intelligence</a> and <a class="underline" href="#">Academic Integrity Protocol</a>.
+            </p>
+</footer>
+</main>
+<!-- Navigation Shell Suppressed (Transactional State) -->
+</body></html>

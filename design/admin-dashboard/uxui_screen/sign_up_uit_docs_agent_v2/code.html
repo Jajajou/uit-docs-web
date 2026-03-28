@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up | UIT_DOCS_AGENT</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "on-tertiary-fixed": "#360f00",
+                "outline": "#737686",
+                "on-tertiary-container": "#ffede6",
+                "surface-container-lowest": "#ffffff",
+                "secondary": "#495c94",
+                "surface-variant": "#e1e3e4",
+                "on-error": "#ffffff",
+                "surface-container-high": "#e7e8e9",
+                "primary-fixed": "#dbe1ff",
+                "surface": "#f8f9fa",
+                "secondary-fixed": "#dbe1ff",
+                "tertiary-fixed": "#ffdbcd",
+                "on-secondary-fixed-variant": "#31447b",
+                "on-background": "#191c1d",
+                "on-primary-fixed-variant": "#003ea8",
+                "secondary-fixed-dim": "#b3c5ff",
+                "on-surface": "#191c1d",
+                "secondary-container": "#acbffe",
+                "on-error-container": "#93000a",
+                "tertiary": "#943700",
+                "inverse-primary": "#b4c5ff",
+                "background": "#f8f9fa",
+                "tertiary-fixed-dim": "#ffb596",
+                "surface-tint": "#0053db",
+                "primary-fixed-dim": "#b4c5ff",
+                "primary": "#004ac6",
+                "inverse-surface": "#2e3132",
+                "on-secondary-container": "#394c84",
+                "inverse-on-surface": "#f0f1f2",
+                "surface-bright": "#f8f9fa",
+                "on-secondary-fixed": "#00174a",
+                "error-container": "#ffdad6",
+                "on-primary-container": "#eeefff",
+                "on-secondary": "#ffffff",
+                "on-surface-variant": "#434655",
+                "primary-container": "#2563eb",
+                "on-tertiary": "#ffffff",
+                "on-primary": "#ffffff",
+                "error": "#ba1a1a",
+                "on-primary-fixed": "#00174b",
+                "surface-container": "#edeeef",
+                "surface-dim": "#d9dadb",
+                "tertiary-container": "#bc4800",
+                "surface-container-low": "#f3f4f5",
+                "on-tertiary-fixed-variant": "#7d2d00",
+                "surface-container-highest": "#e1e3e4",
+                "outline-variant": "#c3c6d7"
+              },
+              fontFamily: {
+                "headline": ["Inter"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .custom-shadow {
+            box-shadow: 0 12px 32px -4px rgba(25, 28, 29, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col">
+<!-- TopNavBar (Shared Component) -->
+<header class="w-full top-0 sticky z-50 bg-slate-50 dark:bg-slate-950 font-sans antialiased text-slate-900 dark:text-slate-100 border-none">
+<div class="flex justify-between items-center px-6 py-4 max-w-7xl mx-auto">
+<div class="text-xl font-bold tracking-tight text-blue-700 dark:text-blue-500">UIT_DOCS_AGENT</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors cursor-pointer active:opacity-70" href="#">Solutions</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors cursor-pointer active:opacity-70" href="#">Architecture</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors cursor-pointer active:opacity-70" href="#">Pricing</a>
+</nav>
+<div class="flex items-center gap-4">
+<a class="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 transition-colors cursor-pointer active:opacity-70" href="#">Login</a>
+<a class="bg-primary text-on-primary px-5 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity" href="#">Sign Up</a>
+</div>
+</div>
+</header>
+<main class="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+<div class="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
+<!-- Left Side: Informative Benefits (The Intellectual Architect) -->
+<div class="hidden lg:flex flex-col justify-center space-y-12 pr-8 border-none">
+<div class="space-y-4">
+<h1 class="text-5xl font-extrabold tracking-tight text-on-surface leading-tight">
+                        The Future of <span class="text-primary italic">Institutional</span> Knowledge.
+                    </h1>
+<p class="text-lg text-on-surface-variant max-w-lg leading-relaxed">
+                        Join the elite ecosystem of AI-driven research and document management. Experience RAG-optimized workflows designed for precision.
+                    </p>
+</div>
+<!-- Bento-style Benefits Grid -->
+<div class="grid grid-cols-1 gap-6">
+<div class="p-6 rounded-xl bg-surface-container-low border-none space-y-3 custom-shadow">
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined" data-icon="neurology">neurology</span>
+<span class="font-bold tracking-wide uppercase text-xs">Core Technology</span>
+</div>
+<h3 class="text-xl font-bold">Advanced RAG Retrieval</h3>
+<p class="text-on-surface-variant text-sm">Context-aware document searching that understands intent, not just keywords.</p>
+</div>
+<div class="p-6 rounded-xl bg-surface-container-low border-none space-y-3 custom-shadow">
+<div class="flex items-center gap-3 text-tertiary">
+<span class="material-symbols-outlined" data-icon="encrypted">encrypted</span>
+<span class="font-bold tracking-wide uppercase text-xs">Compliance First</span>
+</div>
+<h3 class="text-xl font-bold">Secure Knowledge Base</h3>
+<p class="text-on-surface-variant text-sm">Military-grade encryption for all institutional assets and research papers.</p>
+</div>
+<div class="p-6 rounded-xl bg-surface-container-low border-none space-y-3 custom-shadow">
+<div class="flex items-center gap-3 text-secondary">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-bold tracking-wide uppercase text-xs">Collaboration</span>
+</div>
+<h3 class="text-xl font-bold">Collaborative Intelligence</h3>
+<p class="text-on-surface-variant text-sm">Seamlessly share insights and curated document sets across departments.</p>
+</div>
+</div>
+<!-- Security Badges -->
+<div class="pt-8 flex items-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl" data-icon="verified_user">verified_user</span>
+<div class="text-[10px] font-bold leading-none">SOC2<br/>COMPLIANT</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl" data-icon="policy">policy</span>
+<div class="text-[10px] font-bold leading-none">GDPR<br/>CERTIFIED</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl" data-icon="security">security</span>
+<div class="text-[10px] font-bold leading-none">ISO 27001<br/>STANDARDS</div>
+</div>
+</div>
+</div>
+<!-- Right Side: Sign Up Form -->
+<div class="flex items-center justify-center">
+<div class="w-full max-w-md bg-surface-container-lowest p-8 rounded-xl custom-shadow border-none space-y-8">
+<div class="text-center lg:text-left space-y-2">
+<h2 class="text-3xl font-bold text-on-surface">Create Account</h2>
+<p class="text-on-surface-variant text-sm">Enter your professional credentials to begin.</p>
+</div>
+<form class="space-y-5">
+<div class="space-y-1">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Full Name</label>
+<input class="w-full px-4 py-3 bg-surface-container-low rounded-lg outline-variant border border-opacity-20 border-outline focus:ring-2 focus:ring-primary focus:border-primary transition-all text-on-surface" placeholder="Dr. Julian Thorne" type="text"/>
+</div>
+<div class="space-y-1">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Institutional Email</label>
+<input class="w-full px-4 py-3 bg-surface-container-low rounded-lg outline-variant border border-opacity-20 border-outline focus:ring-2 focus:ring-primary focus:border-primary transition-all text-on-surface" placeholder="j.thorne@university.edu" type="email"/>
+</div>
+<div class="space-y-1">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Department/Role</label>
+<select class="w-full px-4 py-3 bg-surface-container-low rounded-lg outline-variant border border-opacity-20 border-outline focus:ring-2 focus:ring-primary focus:border-primary transition-all text-on-surface appearance-none">
+<option>Data Science &amp; Research</option>
+<option>Library &amp; Information Management</option>
+<option>Legal &amp; Compliance</option>
+<option>Engineering</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="space-y-1">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Password</label>
+<input class="w-full px-4 py-3 bg-surface-container-low rounded-lg outline-variant border border-opacity-20 border-outline focus:ring-2 focus:ring-primary focus:border-primary transition-all text-on-surface" placeholder="••••••••" type="password"/>
+</div>
+<div class="space-y-1">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Confirm</label>
+<input class="w-full px-4 py-3 bg-surface-container-low rounded-lg outline-variant border border-opacity-20 border-outline focus:ring-2 focus:ring-primary focus:border-primary transition-all text-on-surface" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="flex items-start gap-3 pt-2">
+<input class="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary" id="terms" type="checkbox"/>
+<label class="text-xs text-on-surface-variant leading-relaxed" for="terms">
+                                I agree to the <a class="text-primary font-medium hover:underline" href="#">Terms of Service</a> and <a class="text-primary font-medium hover:underline" href="#">Privacy Policy</a> regarding institutional data handling.
+                            </label>
+</div>
+<button class="w-full py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold rounded-lg shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
+                            Initialize Account
+                            <span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</form>
+<div class="text-center pt-4">
+<p class="text-sm text-on-surface-variant">
+                            Already have access? <a class="text-primary font-semibold hover:underline" href="#">Sign In</a>
+</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="w-full border-t border-slate-200/20 dark:border-slate-800/20 bg-slate-50 dark:bg-slate-950 mt-auto">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 py-12 w-full max-w-7xl mx-auto space-y-6 md:space-y-0">
+<div class="text-sm font-normal text-slate-500 dark:text-slate-400">
+                © 2024 UIT_DOCS_AGENT. Professional AI Knowledge Management.
+            </div>
+<div class="flex flex-wrap justify-center gap-8">
+<a class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-opacity duration-200" href="#">Privacy Policy</a>
+<a class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-opacity duration-200" href="#">Terms of Service</a>
+<a class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-opacity duration-200" href="#">Security Protocols</a>
+<a class="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-opacity duration-200" href="#">Institutional Access</a>
+</div>
+</div>
+</footer>
+</body></html>

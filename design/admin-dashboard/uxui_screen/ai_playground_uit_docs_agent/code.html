@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>UIT_DOCS_AGENT - AI Playground</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb596",
+              "surface-container-low": "#f3f4f5",
+              "on-background": "#191c1d",
+              "surface": "#f8f9fa",
+              "on-surface-variant": "#434655",
+              "primary-fixed": "#dbe1ff",
+              "error": "#ba1a1a",
+              "tertiary": "#943700",
+              "outline-variant": "#c3c6d7",
+              "secondary-fixed": "#dbe1ff",
+              "on-primary-fixed": "#00174b",
+              "background": "#f8f9fa",
+              "on-secondary-fixed": "#00174a",
+              "on-error-container": "#93000a",
+              "on-primary-fixed-variant": "#003ea8",
+              "secondary": "#495c94",
+              "on-tertiary": "#ffffff",
+              "tertiary-fixed": "#ffdbcd",
+              "on-secondary": "#ffffff",
+              "primary-fixed-dim": "#b4c5ff",
+              "inverse-primary": "#b4c5ff",
+              "outline": "#737686",
+              "tertiary-container": "#bc4800",
+              "on-secondary-fixed-variant": "#31447b",
+              "on-secondary-container": "#394c84",
+              "error-container": "#ffdad6",
+              "on-primary-container": "#eeefff",
+              "surface-container": "#edeeef",
+              "on-error": "#ffffff",
+              "surface-tint": "#0053db",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-high": "#e7e8e9",
+              "inverse-surface": "#2e3132",
+              "secondary-fixed-dim": "#b3c5ff",
+              "primary-container": "#2563eb",
+              "on-primary": "#ffffff",
+              "on-tertiary-fixed": "#360f00",
+              "on-tertiary-container": "#ffede6",
+              "surface-container-highest": "#e1e3e4",
+              "surface-bright": "#f8f9fa",
+              "on-surface": "#191c1d",
+              "secondary-container": "#acbffe",
+              "primary": "#004ac6",
+              "surface-dim": "#d9dadb",
+              "inverse-on-surface": "#f0f1f2",
+              "on-tertiary-fixed-variant": "#7d2d00",
+              "surface-variant": "#e1e3e4"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e1e3e4; border-radius: 10px; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-4 w-[260px] bg-white dark:bg-slate-900 z-50">
+<div class="mb-8 px-4">
+<h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">UIT_DOCS_AGENT</h1>
+<p class="text-xs text-on-surface-variant opacity-70">Admin Console</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="database">database</span>
+<span class="font-medium text-sm">Knowledge Base</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg opacity-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-medium text-sm">AI Agents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-medium text-sm">Query Logs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-medium text-sm">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-medium text-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-4 flex items-center gap-3 bg-surface-container-low rounded-xl">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-xs">AD</div>
+<div class="overflow-hidden">
+<p class="text-xs font-bold truncate text-on-surface">Admin User Profile</p>
+<p class="text-[10px] text-on-surface-variant truncate">admin@uit.edu.vn</p>
+</div>
+</div>
+</aside>
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 right-0 h-16 px-8 ml-[260px] w-[calc(100%-260px)] flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md z-40">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg" data-icon="search">search</span>
+<input class="w-full bg-surface-container-lowest border-none ring-1 ring-outline-variant/20 focus:ring-primary rounded-full py-2 pl-10 pr-4 text-sm outline-none transition-all" placeholder="Search experiments..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-blue-500 cursor-pointer transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-blue-500 cursor-pointer transition-colors" data-icon="help_outline">help_outline</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-blue-500 cursor-pointer transition-colors" data-icon="account_circle">account_circle</span>
+</div>
+<button class="bg-gradient-to-r from-primary to-primary-container text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-md active:scale-95 duration-150">
+                New Query
+            </button>
+</div>
+</header>
+<!-- Main Content Grid -->
+<main class="ml-[260px] pt-16 h-screen flex overflow-hidden">
+<!-- Chat Column (Left 65%) -->
+<section class="w-[65%] flex flex-col h-full bg-surface">
+<!-- Chat Header -->
+<div class="px-8 py-4 flex items-center justify-between bg-surface/50 border-b border-outline-variant/10">
+<div>
+<h2 class="text-lg font-bold text-on-surface tracking-tight">AI Playground</h2>
+<p class="text-xs text-on-surface-variant">Testing: GPT-4o with Document RAG Context</p>
+</div>
+<div class="flex gap-2">
+<button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-high p-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined" data-icon="ios_share">ios_share</span>
+</button>
+</div>
+</div>
+<!-- Messages Canvas -->
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<!-- Admin Bubble -->
+<div class="flex flex-col items-end gap-2">
+<div class="max-w-[80%] bg-primary-container text-on-primary-container px-6 py-4 rounded-2xl rounded-tr-sm shadow-sm">
+<p class="text-[15px] leading-relaxed">How does the Retrieval-Augmented Generation process improve the accuracy of technical document querying in our UIT environment?</p>
+</div>
+<span class="text-[10px] text-on-surface-variant font-medium px-2">14:02 · ADMIN</span>
+</div>
+<!-- AI Bubble -->
+<div class="flex flex-col items-start gap-2">
+<div class="max-w-[85%] bg-surface-container-lowest border border-outline-variant/10 px-6 py-5 rounded-2xl rounded-tl-sm shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary/20"></div>
+<p class="text-[15px] leading-relaxed text-on-surface mb-4">
+                            In the UIT ecosystem, RAG improves accuracy by grounding the model in specific university documentation. Rather than relying on generic pre-trained knowledge, the system:
+                        </p>
+<ul class="space-y-2 mb-4 text-[15px] text-on-surface">
+<li class="flex items-start gap-2"><span class="text-primary mt-1 text-xs">●</span> Retrieves relevant policy fragments from the UIT Database.</li>
+<li class="flex items-start gap-2"><span class="text-primary mt-1 text-xs">●</span> Combines these fragments with the prompt instructions.</li>
+<li class="flex items-start gap-2"><span class="text-primary mt-1 text-xs">●</span> Generates answers with verified citations.</li>
+</ul>
+<div class="flex flex-wrap gap-2 pt-2 border-t border-outline-variant/10">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[11px] font-bold rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="description">description</span> Doc-204
+                            </span>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[11px] font-bold rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="description">description</span> UIT-Policy-V3
+                            </span>
+</div>
+</div>
+<span class="text-[10px] text-on-surface-variant font-medium px-2 uppercase tracking-wider">Generated by UIT_DOCS_AGENT · 2.4s</span>
+</div>
+<!-- Admin Bubble -->
+<div class="flex flex-col items-end gap-2">
+<div class="max-w-[80%] bg-primary-container text-on-primary-container px-6 py-4 rounded-2xl rounded-tr-sm shadow-sm">
+<p class="text-[15px] leading-relaxed">Can you explain the temperature setting for this specific model?</p>
+</div>
+</div>
+<!-- AI Bubble (Thinking) -->
+<div class="flex flex-col items-start gap-2">
+<div class="max-w-[85%] bg-surface-container-lowest border border-outline-variant/10 px-6 py-5 rounded-2xl rounded-tl-sm shadow-sm animate-pulse">
+<div class="flex gap-2">
+<div class="w-2 h-2 bg-primary/40 rounded-full"></div>
+<div class="w-2 h-2 bg-primary/40 rounded-full"></div>
+<div class="w-2 h-2 bg-primary/40 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Chat Input Area -->
+<div class="p-8 pt-0">
+<div class="relative group">
+<div class="absolute inset-0 bg-primary/5 rounded-2xl blur-xl group-focus-within:bg-primary/10 transition-all"></div>
+<div class="relative bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-sm flex items-end p-2 transition-all focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent">
+<button class="p-3 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="attach_file">attach_file</span>
+</button>
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-sm py-3 px-2 resize-none max-h-32" placeholder="Type your query to the knowledge base..." rows="1"></textarea>
+<button class="bg-primary text-white p-3 rounded-xl shadow-lg hover:shadow-primary/20 transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="send" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+<p class="text-center text-[10px] text-on-surface-variant mt-4 uppercase tracking-widest opacity-60">AI model outputs may vary. Grounded with UIT verified docs.</p>
+</div>
+</section>
+<!-- Thought Process Column (Right 35%) -->
+<aside class="w-[35%] bg-surface-container-low h-full flex flex-col border-l border-outline-variant/20">
+<!-- Sidebar Header -->
+<div class="px-6 py-6 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/50">
+<h3 class="font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="psychology">psychology</span>
+                    Execution Trace
+                </h3>
+<span class="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">LIVE</span>
+</div>
+<!-- Scrollable Settings/Trace -->
+<div class="flex-1 overflow-y-auto p-6 space-y-10">
+<!-- Model Config -->
+<section>
+<h4 class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-6">Model Parameters</h4>
+<div class="space-y-6">
+<!-- Model Selection -->
+<div>
+<label class="block text-xs font-semibold text-on-surface mb-2">Primary Model</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-sm appearance-none focus:ring-2 focus:ring-primary/20 outline-none">
+<option>GPT-4o (Reasoning Optimized)</option>
+<option>Claude 3.5 Sonnet</option>
+<option>Llama 3 (On-Premise)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<!-- Sliders -->
+<div class="space-y-4">
+<div>
+<div class="flex justify-between mb-2">
+<label class="text-xs font-semibold text-on-surface">Temperature</label>
+<span class="text-xs font-bold text-primary">0.7</span>
+</div>
+<input class="w-full h-1.5 bg-outline-variant/30 rounded-lg appearance-none cursor-pointer accent-primary" max="2" min="0" step="0.1" type="range" value="0.7"/>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<label class="text-xs font-semibold text-on-surface">Top P</label>
+<span class="text-xs font-bold text-primary">0.9</span>
+</div>
+<input class="w-full h-1.5 bg-outline-variant/30 rounded-lg appearance-none cursor-pointer accent-primary" max="1" min="0" step="0.01" type="range" value="0.9"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Vertical Stepper (Timeline) -->
+<section>
+<h4 class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-6">Retrieval Timeline</h4>
+<div class="relative space-y-6 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-outline-variant/20">
+<!-- Step 1 -->
+<div class="relative pl-8 flex flex-col gap-1">
+<div class="absolute left-0 top-1 w-[24px] h-[24px] bg-green-500 rounded-full flex items-center justify-center border-4 border-surface-container-low z-10">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="check" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<span class="text-xs font-bold text-on-surface">Prompt Pre-processing</span>
+<span class="text-[10px] text-on-surface-variant">Intent: Policy Query · Metadata Extracted</span>
+</div>
+<!-- Step 2 -->
+<div class="relative pl-8 flex flex-col gap-1">
+<div class="absolute left-0 top-1 w-[24px] h-[24px] bg-green-500 rounded-full flex items-center justify-center border-4 border-surface-container-low z-10">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="check" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<span class="text-xs font-bold text-on-surface">Vector Search (UIT_DOCS)</span>
+<div class="bg-surface-container-lowest p-2 rounded-lg mt-1 border border-outline-variant/10">
+<p class="text-[10px] text-on-surface-variant">Similarity: 0.892 · Chunks: 4</p>
+</div>
+</div>
+<!-- Step 3 (Running) -->
+<div class="relative pl-8 flex flex-col gap-1">
+<div class="absolute left-0 top-1 w-[24px] h-[24px] bg-primary rounded-full flex items-center justify-center border-4 border-surface-container-low z-10">
+<div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+</div>
+<span class="text-xs font-bold text-primary">Contextual Synthesis</span>
+<span class="text-[10px] text-on-surface-variant">Aggregating retrieved contexts...</span>
+</div>
+<!-- Step 4 (Pending/Error) -->
+<div class="relative pl-8 flex flex-col gap-1 opacity-40">
+<div class="absolute left-0 top-1 w-[24px] h-[24px] bg-outline rounded-full flex items-center justify-center border-4 border-surface-container-low z-10">
+<span class="material-symbols-outlined text-white text-[14px]" data-icon="filter_list">filter_list</span>
+</div>
+<span class="text-xs font-bold text-on-surface">Compliance Filter</span>
+<span class="text-[10px] text-on-surface-variant">Queued</span>
+</div>
+</div>
+</section>
+<!-- Resource Usage Bento Card -->
+<section>
+<div class="bg-gradient-to-br from-tertiary-container/10 to-transparent p-4 rounded-xl border border-tertiary-container/10">
+<h4 class="text-[10px] font-bold text-tertiary-container uppercase mb-3">Token Economics</h4>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<p class="text-[10px] text-on-surface-variant">Input Tokens</p>
+<p class="text-lg font-bold">1,204</p>
+</div>
+<div>
+<p class="text-[10px] text-on-surface-variant">Cost Estimate</p>
+<p class="text-lg font-bold text-tertiary">$0.0034</p>
+</div>
+</div>
+<div class="mt-4 h-1.5 w-full bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-container" style="width: 45%"></div>
+</div>
+<p class="text-[9px] text-on-surface-variant mt-2">45% of context window utilized (128k max)</p>
+</div>
+</section>
+</div>
+<!-- Actions Footer -->
+<div class="p-6 bg-surface-container-low/80 border-t border-outline-variant/20 grid grid-cols-2 gap-3">
+<button class="bg-surface-container-high text-on-surface text-xs font-bold py-3 rounded-lg hover:bg-surface-container-highest transition-all">
+                    Reset Session
+                </button>
+<button class="bg-on-surface text-surface text-xs font-bold py-3 rounded-lg hover:bg-on-surface/90 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="save">save</span>
+                    Save Trace
+                </button>
+</div>
+</aside>
+</main>
+<!-- Visual Polish: Abstract Patterns -->
+<div class="fixed top-0 right-0 -z-10 w-1/2 h-1/2 bg-gradient-to-bl from-primary/5 via-transparent to-transparent pointer-events-none"></div>
+<div class="fixed bottom-0 left-0 -z-10 w-1/2 h-1/2 bg-gradient-to-tr from-secondary/5 via-transparent to-transparent pointer-events-none"></div>
+</body></html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Knowledge Base - UIT_DOCS_AGENT</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#ffb596",
+              "surface-container-low": "#f3f4f5",
+              "on-background": "#191c1d",
+              "surface": "#f8f9fa",
+              "on-surface-variant": "#434655",
+              "primary-fixed": "#dbe1ff",
+              "error": "#ba1a1a",
+              "tertiary": "#943700",
+              "outline-variant": "#c3c6d7",
+              "secondary-fixed": "#dbe1ff",
+              "on-primary-fixed": "#00174b",
+              "background": "#f8f9fa",
+              "on-secondary-fixed": "#00174a",
+              "on-error-container": "#93000a",
+              "on-primary-fixed-variant": "#003ea8",
+              "secondary": "#495c94",
+              "on-tertiary": "#ffffff",
+              "tertiary-fixed": "#ffdbcd",
+              "on-secondary": "#ffffff",
+              "primary-fixed-dim": "#b4c5ff",
+              "inverse-primary": "#b4c5ff",
+              "outline": "#737686",
+              "tertiary-container": "#bc4800",
+              "on-secondary-fixed-variant": "#31447b",
+              "on-secondary-container": "#394c84",
+              "error-container": "#ffdad6",
+              "on-primary-container": "#eeefff",
+              "surface-container": "#edeeef",
+              "on-error": "#ffffff",
+              "surface-tint": "#0053db",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-high": "#e7e8e9",
+              "inverse-surface": "#2e3132",
+              "secondary-fixed-dim": "#b3c5ff",
+              "primary-container": "#2563eb",
+              "on-primary": "#ffffff",
+              "on-tertiary-fixed": "#360f00",
+              "on-tertiary-container": "#ffede6",
+              "surface-container-highest": "#e1e3e4",
+              "surface-bright": "#f8f9fa",
+              "on-surface": "#191c1d",
+              "secondary-container": "#acbffe",
+              "primary": "#004ac6",
+              "surface-dim": "#d9dadb",
+              "inverse-on-surface": "#f0f1f2",
+              "on-tertiary-fixed-variant": "#7d2d00",
+              "surface-variant": "#e1e3e4"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="text-on-background">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col p-4 w-[260px] bg-white dark:bg-slate-900 border-r-0 z-50">
+<div class="mb-8 px-4">
+<h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">UIT_DOCS_AGENT</h1>
+<p class="text-xs text-on-surface-variant opacity-70">Admin Console</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Dashboard -->
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<!-- Knowledge Base - ACTIVE -->
+<a class="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg opacity-90 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="database">database</span>
+<span class="font-medium text-sm">Knowledge Base</span>
+</a>
+<!-- AI Agents -->
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="smart_toy">smart_toy</span>
+<span class="font-medium text-sm">AI Agents</span>
+</a>
+<!-- Query Logs -->
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-medium text-sm">Query Logs</span>
+</a>
+<!-- Analytics -->
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-medium text-sm">Analytics</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-3 px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-medium text-sm">Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-4 bg-surface-container-low rounded-xl flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-xs">AD</div>
+<div class="overflow-hidden">
+<p class="text-xs font-bold truncate">Admin User</p>
+<p class="text-[10px] text-on-surface-variant truncate">admin@uit.edu.vn</p>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[260px] min-h-screen">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between h-16 px-8 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+<div class="flex-1 flex items-center">
+<div class="relative w-full max-w-xl">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-md py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-primary transition-all" placeholder="Search knowledge base items, tags or citations..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4 ml-8">
+<button class="flex items-center gap-2 bg-primary-container text-on-primary text-sm font-semibold px-5 py-2 rounded-[6px] shadow-sm hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+                    THÊM DỮ LIỆU
+                </button>
+<div class="h-6 w-[1px] bg-outline-variant/30"></div>
+<div class="flex gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="p-8">
+<div class="flex flex-col lg:flex-row gap-8">
+<!-- Quick Filters Sidebar (Left) -->
+<aside class="w-full lg:w-64 space-y-6">
+<div>
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-widest mb-4">Content Type</h3>
+<div class="space-y-2">
+<button class="flex items-center justify-between w-full px-4 py-2 bg-surface-container-highest text-primary rounded-full text-sm font-semibold">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">description</span>
+<span>PDF Documents</span>
+</div>
+<span class="bg-primary/10 px-2 py-0.5 rounded-full text-[10px]">124</span>
+</button>
+<button class="flex items-center justify-between w-full px-4 py-2 text-on-surface-variant hover:bg-surface-container-low rounded-full text-sm font-medium transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">language</span>
+<span>Web Pages</span>
+</div>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px]">42</span>
+</button>
+<button class="flex items-center justify-between w-full px-4 py-2 text-on-surface-variant hover:bg-surface-container-low rounded-full text-sm font-medium transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">table_chart</span>
+<span>Sheets / Data</span>
+</div>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px]">18</span>
+</button>
+</div>
+</div>
+<div>
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-widest mb-4">Storage Usage</h3>
+<div class="bg-surface-container-low rounded-xl p-4 border border-outline-variant/10">
+<div class="flex justify-between text-xs mb-2">
+<span class="text-on-surface-variant">Cloud Storage</span>
+<span class="font-bold">64%</span>
+</div>
+<div class="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[64%]"></div>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-3 leading-relaxed">Using 1.2GB of 2GB allocated for the Faculty tier.</p>
+</div>
+</div>
+</aside>
+<!-- Main Data Table Container -->
+<div class="flex-1 bg-surface-container-lowest rounded-xl shadow-[0_12px_32px_-4px_rgba(25,28,29,0.06)] overflow-hidden">
+<div class="p-6 border-b border-surface-container-low flex items-center justify-between">
+<div>
+<h2 class="text-xl font-bold tracking-tight">Active Repositories</h2>
+<p class="text-sm text-on-surface-variant">Manage your RAG vector database sources</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors text-outline">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors text-outline">
+<span class="material-symbols-outlined">sort</span>
+</button>
+</div>
+</div>
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-surface-container-low/30">
+<th class="text-left px-6 py-4 text-xs font-bold text-outline uppercase tracking-wider">Source Name</th>
+<th class="text-left px-6 py-4 text-xs font-bold text-outline uppercase tracking-wider">Status</th>
+<th class="text-left px-6 py-4 text-xs font-bold text-outline uppercase tracking-wider">Indexed Date</th>
+<th class="text-left px-6 py-4 text-xs font-bold text-outline uppercase tracking-wider">Confidence</th>
+<th class="text-right px-6 py-4 text-xs font-bold text-outline uppercase tracking-wider">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<!-- Table Row 1 -->
+<tr class="hover:bg-surface-container-low/20 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">academic_handbook_2024.pdf</p>
+<p class="text-xs text-on-surface-variant">4.2 MB • PDF Document</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700">
+                                        READY
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Oct 12, 2023</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1 w-24">
+<div class="flex justify-between text-[10px] font-bold">
+<span class="text-tertiary">98%</span>
+</div>
+<div class="h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[98%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 2 -->
+<tr class="hover:bg-surface-container-low/20 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined">public</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">uit_curriculum_web_portal</p>
+<p class="text-xs text-on-surface-variant">Scraped • 12 Pages</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700">
+                                        INDEXING
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Oct 14, 2023</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1 w-24">
+<div class="flex justify-between text-[10px] font-bold">
+<span class="text-tertiary">42%</span>
+</div>
+<div class="h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[42%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 3 -->
+<tr class="hover:bg-surface-container-low/20 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+<span class="material-symbols-outlined">table_view</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">student_grades_q1_raw.xlsx</p>
+<p class="text-xs text-on-surface-variant">84 KB • Spreadsheet</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-green-100 text-green-700">
+                                        READY
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Sep 28, 2023</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1 w-24">
+<div class="flex justify-between text-[10px] font-bold">
+<span class="text-tertiary">100%</span>
+</div>
+<div class="h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-full"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 4 -->
+<tr class="hover:bg-surface-container-low/20 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined">link</span>
+</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">research_api_documentation</p>
+<p class="text-xs text-on-surface-variant">External API Connector</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700">
+                                        WARNING
+                                    </span>
+</td>
+<td class="px-6 py-5 text-sm text-on-surface-variant">Oct 05, 2023</td>
+<td class="px-6 py-5">
+<div class="flex flex-col gap-1 w-24">
+<div class="flex justify-between text-[10px] font-bold">
+<span class="text-tertiary">61%</span>
+</div>
+<div class="h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container w-[61%]"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-4 border-t border-surface-container-low flex items-center justify-between">
+<p class="text-xs text-on-surface-variant">Showing 1-4 of 184 sources</p>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center rounded-md border border-outline-variant/20 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-md bg-primary text-on-primary text-xs font-bold">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-low text-xs font-medium">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface-container-low text-xs font-medium">3</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-md border border-outline-variant/20 text-on-surface-variant">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Stats Area -->
+<section class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary" data-icon="search_check">search_check</span>
+<h4 class="text-sm font-bold tracking-tight">Search Relevance</h4>
+</div>
+<p class="text-3xl font-extrabold text-on-surface">94.2%</p>
+<p class="text-xs text-on-surface-variant mt-2">+2.4% from last update</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-tertiary" data-icon="citation">format_quote</span>
+<h4 class="text-sm font-bold tracking-tight">Source Citations</h4>
+</div>
+<p class="text-3xl font-extrabold text-on-surface">1.2k</p>
+<p class="text-xs text-on-surface-variant mt-2">Verified citations generated</p>
+</div>
+<div class="bg-primary text-on-primary p-6 rounded-xl relative overflow-hidden">
+<div class="relative z-10">
+<h4 class="text-sm font-bold opacity-80 mb-4">Storage Insight</h4>
+<p class="text-lg font-medium leading-tight">Your database is 85% optimized for Retrieval-Augmented Generation.</p>
+<button class="mt-4 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-md text-xs font-bold transition-all">Run Optimizer</button>
+</div>
+<div class="absolute -bottom-4 -right-4 opacity-10">
+<span class="material-symbols-outlined text-[120px]" style="font-variation-settings: 'FILL' 1;">memory</span>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

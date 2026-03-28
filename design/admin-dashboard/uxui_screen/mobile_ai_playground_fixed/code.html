@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>UIT_DOCS_AGENT - AI Chat Playground</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2563EB",
+              "secondary": "#6275AF",
+              "tertiary": "#BC4800",
+              "background": "#F9FAFB",
+              "on-surface": "#1F2937",
+              "on-surface-variant": "#4B5563",
+              "outline-variant": "#E5E7EB",
+              "error": "#EF4444"
+            },
+            fontFamily: {
+              "headline": ["Inter", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+            },
+            borderRadius: {
+              "chat": "16px",
+            },
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .chat-scroll-area {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .chat-scroll-area::-webkit-scrollbar {
+            display: none;
+        }
+        body {
+            background-color: #F9FAFB;
+        }
+    </style>
+</head>
+<body class="font-body text-on-surface flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="w-full sticky top-0 z-50 bg-white border-b border-outline-variant px-4 py-3 flex justify-between items-center shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="school">school</span>
+<h1 class="text-lg font-bold tracking-tight text-primary">UIT_DOCS_AGENT</h1>
+</div>
+<button class="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-semibold active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="account_tree">account_tree</span>
+        View Logic
+    </button>
+</header>
+<!-- Main Chat Canvas -->
+<main class="flex-1 overflow-y-auto chat-scroll-area px-4 pt-6 pb-24 flex flex-col gap-6">
+<!-- Welcome Message -->
+<div class="flex flex-col items-center mb-4 text-center">
+<div class="w-14 h-14 rounded-full bg-primary/5 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<h2 class="text-on-surface font-semibold text-base">Knowledge Assistant</h2>
+<p class="text-on-surface-variant text-xs mt-1 max-w-[220px]">Ready to assist with UIT university documentation.</p>
+</div>
+<!-- AI Message -->
+<div class="flex flex-col gap-1.5 max-w-[85%] self-start">
+<div class="bg-white text-on-surface p-4 rounded-chat rounded-tl-none shadow-sm border border-outline-variant/50">
+<p class="text-[15px] leading-relaxed">Chào bạn! Tôi là UIT_DOCS_AGENT. Bạn cần tìm kiếm thông tin gì trong hệ thống tài liệu hôm nay?</p>
+</div>
+<span class="text-[10px] text-on-surface-variant px-1 font-bold uppercase tracking-wider">AI ASSISTANT • 09:41 AM</span>
+</div>
+<!-- Admin Message (User) -->
+<div class="flex flex-col gap-1.5 max-w-[85%] self-end">
+<div class="bg-primary text-white p-4 rounded-chat rounded-tr-none shadow-md">
+<p class="text-[15px] leading-relaxed">Cho mình hỏi về quy trình đăng ký môn học học kỳ phụ tại UIT.</p>
+</div>
+<span class="text-[10px] text-on-surface-variant px-1 text-right font-bold uppercase tracking-wider">ADMIN • JUST NOW</span>
+</div>
+<!-- AI Detailed Response with Citations -->
+<div class="flex flex-col gap-3 max-w-[90%] self-start">
+<div class="bg-white text-on-surface p-4 rounded-chat rounded-tl-none shadow-sm border border-outline-variant/50">
+<p class="text-[15px] leading-relaxed mb-3">Dựa trên Sổ tay sinh viên UIT, quy trình đăng ký học kỳ phụ bao gồm các bước sau:</p>
+<ol class="list-decimal list-inside space-y-2 text-sm text-on-surface-variant">
+<li>Theo dõi thông báo tại website <span class="text-primary font-medium">daa.uit.edu.vn</span>.</li>
+<li>Đăng ký trực tuyến qua Portal cá nhân.</li>
+<li>Đóng học phí tại ngân hàng liên kết hoặc trực tiếp.</li>
+</ol>
+</div>
+<!-- Citation Chips -->
+<div class="flex flex-wrap gap-2 px-1">
+<div class="bg-secondary/10 text-secondary px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-secondary/20">
+<span class="material-symbols-outlined text-[14px]" data-icon="description">description</span>
+                SO_TAY_SV_2023.PDF
+            </div>
+<div class="bg-secondary/10 text-secondary px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 border border-secondary/20">
+<span class="material-symbols-outlined text-[14px]" data-icon="link">link</span>
+                DAA_ANNOUNCEMENT_042
+            </div>
+</div>
+</div>
+</main>
+<!-- Bottom Input Area -->
+<section class="fixed bottom-0 left-0 w-full z-40 px-4 pb-6 pt-2 bg-gradient-to-t from-background via-background to-transparent">
+<div class="max-w-md mx-auto relative flex items-center gap-2 bg-white rounded-full pl-4 pr-1.5 py-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-outline-variant">
+<input class="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 text-on-surface placeholder:text-on-surface-variant/50" placeholder="Ask UIT_DOCS_AGENT..." type="text"/>
+<button class="bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="send" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</section>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 hidden md:flex justify-around items-center px-4 pb-6 pt-3 bg-white border-t border-outline-variant">
+<!-- Navigation simplified for mobile UI but present as requested -->
+</nav>
+<!-- System Logic Drawer (Hidden by default) -->
+<div class="fixed inset-0 z-[60] hidden">
+<div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+<div class="absolute bottom-0 left-0 right-0 h-[80%] bg-white rounded-t-[32px] shadow-2xl flex flex-col p-6">
+<div class="w-12 h-1.5 bg-outline-variant rounded-full mx-auto mb-6"></div>
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-lg text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="troubleshoot">troubleshoot</span>
+                System Logic Trace
+            </h3>
+<span class="text-[10px] font-bold bg-tertiary text-white px-2 py-1 rounded">DEBUG</span>
+</div>
+<!-- Simplified Trace Steps -->
+<div class="space-y-6 overflow-y-auto">
+<div class="flex gap-4">
+<div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 flex items-center justify-center text-[10px] text-white font-bold">1</div>
+<div>
+<p class="text-[11px] font-bold text-on-surface-variant uppercase mb-1">Embedding Query</p>
+<p class="text-sm font-mono bg-background p-2 rounded border border-outline-variant">"đăng ký học kỳ phụ uit"</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>
