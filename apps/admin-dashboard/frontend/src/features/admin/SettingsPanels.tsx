@@ -87,7 +87,7 @@ export function SettingsPanels({ scenario }: { scenario?: string }) {
                     These panels now persist through the `/api/admin/settings` contract. Sensitive settings stay masked in the UI while still allowing admins to rotate the underlying value.
                 </p>
                 <p className="text-sm text-brand-700 dark:text-brand-300">
-                    Publication settings also expose the break-glass contract: operator-owned remediation actions remain primary, while admin override is reserved for audited support incidents.
+                    Publication settings also expose the control contract: admin-owned remediation actions stay visible in audit history and remain the only path for review, retry, archive and reindex.
                 </p>
             </Card>
 

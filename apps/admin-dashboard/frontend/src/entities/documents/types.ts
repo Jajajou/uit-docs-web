@@ -1,5 +1,5 @@
 import type { AuditActionType, AuditTargetType } from '@/entities/admin/types'
-import type { Role } from '@/entities/auth/types'
+import type { Role, RoleDto } from '@/entities/auth/types'
 
 export type DocumentLifecycleStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'archived'
 export type ProcessingStatus = 'pending' | 'uploading' | 'extracting' | 'indexing' | 'completed' | 'failed'
@@ -138,7 +138,7 @@ export interface DocumentTraceabilityDto {
 export interface DocumentActivityEntryDto {
     id: string
     actor_name: string
-    actor_role: Role
+    actor_role: RoleDto
     action: AuditActionType
     target_type: AuditTargetType
     target_id: string

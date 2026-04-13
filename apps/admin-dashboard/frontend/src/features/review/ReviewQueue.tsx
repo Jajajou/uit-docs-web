@@ -62,14 +62,14 @@ function getDecisionSummary(status: DecisionStatus, task: ReviewTask) {
     }
 
     if (status === 'approved') {
-        return 'Approved items stay available to internal staff and operators.'
+        return 'Approved items stay available to internal staff and admins.'
     }
 
     if (status === 'rejected') {
         return 'Rejected items should never appear in trusted assistant answers.'
     }
 
-    return 'Requesting changes keeps the submission out of trusted assistant answers until the lecturer resubmits and the reviewer approves it.'
+    return 'Requesting changes keeps the submission out of trusted assistant answers until the teacher resubmits and the reviewer approves it.'
 }
 
 export function ReviewQueue({ scenario }: { scenario?: string }) {
@@ -168,7 +168,7 @@ export function ReviewQueue({ scenario }: { scenario?: string }) {
                             Reviewer decision workspace
                         </div>
                         <p className="text-sm text-gray-500">
-                            This queue connects lecturer submissions to publication outcomes. Reviewers validate metadata, decision status and public-chat eligibility.
+                            This queue connects teacher submissions to publication outcomes. Reviewers validate metadata, decision status and public-chat eligibility.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -204,7 +204,7 @@ export function ReviewQueue({ scenario }: { scenario?: string }) {
                             <div className="mb-4 rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900 dark:border-warning-800 dark:bg-warning-950 dark:text-warning-100">
                                 <div className="font-semibold">Break-glass support mode</div>
                                 <p className="mt-2">
-                                    Review decisions remain operator-owned by default. As `admin`, you are using an explicit support override and every decision stays visible in audit logs.
+                                    Review decisions remain admin-owned and every decision stays visible in audit logs.
                                 </p>
                             </div>
                         ) : null}
@@ -327,7 +327,7 @@ function ReviewTaskDetail({
                             className="mt-3"
                             value={decisionNote}
                             onChange={(event) => onDecisionNoteChange(event.target.value)}
-                            placeholder="Capture the decision rationale or the follow-up required from the lecturer."
+                                placeholder="Capture the decision rationale or the follow-up required from the teacher."
                         />
                     </div>
                     <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900 dark:bg-brand-950">

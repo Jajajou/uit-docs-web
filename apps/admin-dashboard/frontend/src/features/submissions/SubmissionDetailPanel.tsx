@@ -109,7 +109,7 @@ export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?:
             label: 'Reviewer decision',
             description: relatedReviewTask
                 ? `${relatedReviewTask.reviewerName} marked this as ${formatStatusLabel(relatedReviewTask.status)}.`
-                : 'Waiting for operator review and metadata confirmation.',
+                                : 'Waiting for admin review and metadata confirmation.',
             state:
                 submission.lifecycleStatus === 'approved'
                     ? ('done' as const)
@@ -150,7 +150,7 @@ export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?:
                         <div>
                             <h2 className="text-xl font-semibold text-gray-950 dark:text-white">{submission.title}</h2>
                             <p className="mt-1 text-sm text-gray-500">
-                                This screen bridges lecturer intake with reviewer action and eventual publication into public-facing knowledge routes.
+                            This screen bridges teacher intake with reviewer action and eventual publication into public-facing knowledge routes.
                             </p>
                         </div>
                     </div>

@@ -1,6 +1,7 @@
 import type {
     AdminUser,
     AdminUserDto,
+    AdminUserScope,
     RolePolicy,
     RolePolicyDto,
     SystemSetting,
@@ -8,15 +9,28 @@ import type {
     AuditLogEntry,
     AuditLogEntryDto,
 } from '@/entities/admin/types'
+import { normalizeRole } from '@/entities/auth/roles'
+
+function normalizeAdminScope(scope: AdminUserDto['scope']): AdminUserScope {
+    if (scope === 'contributor_portal') {
+        return 'teacher_workspace'
+    }
+
+    if (scope === 'operator_portal') {
+        return 'admin_console'
+    }
+
+    return scope
+}
 
 export function mapAdminUserDtoToAdminUser(dto: AdminUserDto): AdminUser {
     return {
         id: dto.id,
         name: dto.name,
         email: dto.email,
-        role: dto.role,
+        role: normalizeRole(dto.role),
         status: dto.status,
-        scope: dto.scope,
+        scope: normalizeAdminScope(dto.scope),
         lastActiveAt: dto.last_active_at,
         isInternalDomainCompliant: dto.is_internal_domain_compliant,
     }
@@ -24,7 +38,7 @@ export function mapAdminUserDtoToAdminUser(dto: AdminUserDto): AdminUser {
 
 export function mapRolePolicyDtoToRolePolicy(dto: RolePolicyDto): RolePolicy {
     return {
-        role: dto.role,
+        role: normalizeRole(dto.role),
         allowedShells: dto.allowed_shells,
         allowedRoutes: dto.allowed_routes,
         requiresInternalEmail: dto.requires_internal_email,
@@ -47,7 +61,7 @@ export function mapAuditLogEntryDtoToAuditLogEntry(dto: AuditLogEntryDto): Audit
     return {
         id: dto.id,
         actorName: dto.actor_name,
-        actorRole: dto.actor_role,
+        actorRole: normalizeRole(dto.actor_role),
         action: dto.action,
         targetType: dto.target_type,
         targetId: dto.target_id,

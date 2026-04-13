@@ -6,16 +6,16 @@ export default function HomePage() {
     return (
         <div className="space-y-8">
             <PageHeader
-                title="UIT Knowledge Portal"
-                description="Foundational public shell for student-facing search, citations and document-aware answers."
+                title="UIT AI"
+                description="Không gian tra cứu của UIT AI với chat tham chiếu, nguồn tài liệu và kiểm soát vai trò rõ ràng."
                 icon={Bot}
                 actions={
                     <>
                         <Button asChild>
-                            <Link to="/chat">Open chat</Link>
+                            <Link to="/chat">Mở chat</Link>
                         </Button>
                         <Button asChild variant="secondary">
-                            <Link to="/auth/login">Switch role</Link>
+                            <Link to="/auth/login">Đăng nhập</Link>
                         </Button>
                     </>
                 }
@@ -24,18 +24,18 @@ export default function HomePage() {
             <div className="grid gap-6 lg:grid-cols-3">
                 <Card className="space-y-3">
                     <Bot className="text-brand-600" />
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Public chat</div>
-                    <p className="text-sm text-gray-500">Validate references, warnings and confidence states before backend streaming lands.</p>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Chat tham chiếu</div>
+                    <p className="text-sm text-gray-500">Tra cứu nhanh với cảnh báo, độ tin cậy và liên kết tới nguồn tài liệu liên quan.</p>
                 </Card>
                 <Card className="space-y-3">
                     <FileSearch className="text-brand-600" />
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Document detail</div>
-                    <p className="text-sm text-gray-500">Public document route exposes temporal, system and supplemental metadata in a stable contract.</p>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Nguồn tài liệu</div>
+                    <p className="text-sm text-gray-500">Trang chi tiết chỉ giữ các thông tin đủ để đọc, trích dẫn và kiểm tra hiệu lực của tài liệu.</p>
                 </Card>
                 <Card className="space-y-3">
                     <Upload className="text-brand-600" />
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Internal portal</div>
-                    <p className="text-sm text-gray-500">Lecturers, operators and admins are separated by route guards and session role state.</p>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-white">Không gian nội bộ</div>
+                    <p className="text-sm text-gray-500">Giảng viên và quản trị viên có luồng tải tài liệu, kiểm soát hệ thống và phân quyền riêng.</p>
                 </Card>
             </div>
         </div>

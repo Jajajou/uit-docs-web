@@ -16,7 +16,7 @@ router = APIRouter()
 @router.get("", response_model=ReviewsResponse)
 async def list_reviews(
     status: Annotated[str | None, Query()] = None,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"tasks": service.list_reviews(context.scenario, status=status)}
@@ -26,7 +26,7 @@ async def list_reviews(
 async def apply_decision(
     review_id: str,
     payload: ReviewDecisionRequest,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"task": service.apply_review_decision(review_id, payload.model_dump(exclude_none=True), context.role)}

@@ -7,13 +7,13 @@ import type {
 } from '@/entities/admin/types'
 import type { Role } from '@/entities/auth/types'
 
-const roleOrder: Role[] = ['guest', 'student', 'lecturer', 'operator', 'admin']
+const roleOrder: Role[] = ['student', 'teacher', 'admin']
 
 export const adminUserFixtures: AdminUserDto[] = [
     {
         id: 'usr-001',
         name: 'Nguyen Minh Student',
-        email: 'student@uit.edu.vn',
+        email: 'student@gm.uit.edu.vn',
         role: 'student',
         status: 'active',
         scope: 'student_portal',
@@ -22,21 +22,21 @@ export const adminUserFixtures: AdminUserDto[] = [
     },
     {
         id: 'usr-002',
-        name: 'Pham Van Lecturer',
-        email: 'lecturer@gm.uit.edu.vn',
-        role: 'lecturer',
+        name: 'Pham Van Teacher',
+        email: 'teacher@gm.uit.edu.vn',
+        role: 'teacher',
         status: 'active',
-        scope: 'contributor_portal',
+        scope: 'teacher_workspace',
         last_active_at: '2026-03-20T06:42:00.000Z',
         is_internal_domain_compliant: true,
     },
     {
         id: 'usr-003',
-        name: 'Le Thi Operator',
-        email: 'operator@gm.uit.edu.vn',
-        role: 'operator',
+        name: 'Tran Thi Admin Support',
+        email: 'admin-support@gm.uit.edu.vn',
+        role: 'admin',
         status: 'active',
-        scope: 'operator_portal',
+        scope: 'admin_console',
         last_active_at: '2026-03-20T06:58:00.000Z',
         is_internal_domain_compliant: true,
     },
@@ -52,11 +52,11 @@ export const adminUserFixtures: AdminUserDto[] = [
     },
     {
         id: 'usr-005',
-        name: 'Invite Pending Lecturer',
-        email: 'pending-lecturer@gm.uit.edu.vn',
-        role: 'lecturer',
+        name: 'Invite Pending Teacher',
+        email: 'pending-teacher@gm.uit.edu.vn',
+        role: 'teacher',
         status: 'invited',
-        scope: 'contributor_portal',
+        scope: 'teacher_workspace',
         last_active_at: '2026-03-18T02:10:00.000Z',
         is_internal_domain_compliant: true,
     },
@@ -66,7 +66,7 @@ export const nonCompliantAdminUserFixtures: AdminUserDto[] = adminUserFixtures.m
     user.id === 'usr-005'
         ? {
             ...user,
-            email: 'pending-lecturer@gmail.com',
+            email: 'pending-teacher@gmail.com',
             is_internal_domain_compliant: false,
         }
         : user,
@@ -93,7 +93,7 @@ export const systemSettingFixtures: SystemSettingDto[] = [
     {
         group: 'auth',
         key: 'sso_provider',
-        label: 'Lecturer SSO provider',
+        label: 'Teacher SSO provider',
         value: 'UIT Google Workspace SSO',
         description: 'Internal staff accounts must authenticate via institutional SSO.',
         is_sensitive: false,
@@ -103,8 +103,8 @@ export const systemSettingFixtures: SystemSettingDto[] = [
         group: 'auth',
         key: 'internal_domain_rule',
         label: 'Internal domain rule',
-        value: '@gm.uit.edu.vn required for lecturer/operator/admin',
-        description: 'Contributor and admin roles are valid only with the institutional mail domain.',
+        value: '@gm.uit.edu.vn required for teacher/admin',
+        description: 'Teacher and admin roles are valid only with the institutional mail domain.',
         is_sensitive: false,
         source: 'derived_contract',
     },
@@ -113,16 +113,16 @@ export const systemSettingFixtures: SystemSettingDto[] = [
         key: 'publication_gate',
         label: 'Publication gate',
         value: 'Review approval required before public release',
-        description: 'Lecturer uploads remain provisional until the operator review step approves them.',
+        description: 'Teacher uploads remain provisional until the admin review step approves them.',
         is_sensitive: false,
         source: 'derived_contract',
     },
     {
         group: 'publication',
         key: 'admin_break_glass_override',
-        label: 'Admin break-glass override',
-        value: 'Admin may execute operator-owned remediation actions with explicit audit trail',
-        description: 'Archive, reindex, retry and review decisions remain operator-owned by default; admin uses them only for audited support incidents.',
+        label: 'Admin control ownership',
+        value: 'Admin executes review and remediation actions with explicit audit trail',
+        description: 'Archive, reindex, retry and review decisions remain admin-owned and auditable.',
         is_sensitive: false,
         source: 'derived_contract',
     },
@@ -149,8 +149,8 @@ export const systemSettingFixtures: SystemSettingDto[] = [
 export const auditLogFixtures: AuditLogEntryDto[] = [
     {
         id: 'audit-001',
-        actor_name: 'Pham Van Lecturer',
-        actor_role: 'lecturer',
+        actor_name: 'Pham Van Teacher',
+        actor_role: 'teacher',
         action: 'upload_submission',
         target_type: 'submission',
         target_id: 'sub-002',
@@ -159,8 +159,8 @@ export const auditLogFixtures: AuditLogEntryDto[] = [
     },
     {
         id: 'audit-002',
-        actor_name: 'Le Thi Operator',
-        actor_role: 'operator',
+        actor_name: 'Tran Van Admin',
+        actor_role: 'admin',
         action: 'approve_review',
         target_type: 'review',
         target_id: 'review-002',
@@ -169,8 +169,8 @@ export const auditLogFixtures: AuditLogEntryDto[] = [
     },
     {
         id: 'audit-003',
-        actor_name: 'Le Thi Operator',
-        actor_role: 'operator',
+        actor_name: 'Tran Van Admin',
+        actor_role: 'admin',
         action: 'approve_review',
         target_type: 'document',
         target_id: 'doc-004',
@@ -189,8 +189,8 @@ export const auditLogFixtures: AuditLogEntryDto[] = [
     },
     {
         id: 'audit-004b',
-        actor_name: 'Le Thi Operator',
-        actor_role: 'operator',
+        actor_name: 'Tran Van Admin',
+        actor_role: 'admin',
         action: 'reindex_document',
         target_type: 'document',
         target_id: 'doc-002',
@@ -223,8 +223,8 @@ export const denseAuditLogFixtures: AuditLogEntryDto[] = [
     ...auditLogFixtures,
     {
         id: 'audit-006',
-        actor_name: 'Le Thi Operator',
-        actor_role: 'operator',
+        actor_name: 'Tran Van Admin',
+        actor_role: 'admin',
         action: 'reject_review',
         target_type: 'review',
         target_id: 'review-003',

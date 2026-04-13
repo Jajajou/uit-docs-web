@@ -10,9 +10,7 @@ function getRoleTone(role: RolePolicy['role']) {
     switch (role) {
         case 'admin':
             return 'danger' as const
-        case 'operator':
-            return 'brand' as const
-        case 'lecturer':
+        case 'teacher':
             return 'success' as const
         case 'student':
             return 'neutral' as const
@@ -38,17 +36,17 @@ export function RolePoliciesPanel({ scenario }: { scenario?: string }) {
                     </p>
                     <div className="flex flex-wrap gap-2">
                         <Badge tone="neutral">{routeMeta.length} routes</Badge>
-                        <Badge tone="brand">{routeMeta.filter((route) => route.shell === 'portal').length} portal</Badge>
-                        <Badge tone="danger">{routeMeta.filter((route) => route.shell === 'admin').length} admin</Badge>
+                        <Badge tone="brand">{routeMeta.filter((route) => route.shell === 'app').length} app</Badge>
+                        <Badge tone="danger">{routeMeta.filter((route) => route.shell === 'system').length} system</Badge>
                     </div>
                 </Card>
                 <Card className="space-y-2 border-brand-200 bg-brand-50 dark:border-brand-900 dark:bg-brand-950">
                     <div className="text-sm font-semibold text-brand-800 dark:text-brand-200">Policy summary</div>
                     <p className="text-sm text-brand-700 dark:text-brand-300">
-                        Internal roles require institutional email and are blocked at the route guard if the session email is non-compliant. Uploads must pass operator review before publication, and public chat must always expose citations and warnings.
+                        Internal roles require institutional email and are blocked at the route guard if the session email is non-compliant. Teacher uploads must pass admin review before publication, and public chat must always expose citations and warnings.
                     </p>
                     <p className="text-sm text-brand-700 dark:text-brand-300">
-                        Admin retains a narrow break-glass support override for operator-owned remediation flows such as review decisions, job retry, archive and reindex. Those actions should be labeled explicitly and remain visible in audit logs.
+                        Admin owns review, retry, archive and reindex flows directly, and those actions should remain visible in audit logs.
                     </p>
                 </Card>
             </div>

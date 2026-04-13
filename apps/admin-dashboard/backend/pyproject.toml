@@ -12,12 +12,18 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.9.0",
     "aiofiles>=24.1.0",
+    "sqlalchemy>=2.0.0",
 ]
 
 [project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.13.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.1.1",
     "httpx>=0.27.0",
     "ruff>=0.8.0",
 ]
@@ -35,4 +41,30 @@ lint.select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"
-norecursedirs = [".pytest_cache", "pytest-cache-files-*"]
+testpaths = ["tests"]
+markers = [
+    "integration: smoke and environment-dependent tests against external services such as Postgres",
+]
+norecursedirs = [
+    ".pytest_cache",
+    "pytest-cache-files-*",
+    ".local_site",
+    ".pydeps",
+    "pydeps_conda",
+    "pydeps_runtime",
+    ".venv_check",
+    ".venv_live",
+    "tmp_test_db",
+    "tmp_virtualenv",
+    "uploads",
+    "data",
+    "__pycache__",
+]
+
+[tool.coverage.run]
+source = ["api"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 85

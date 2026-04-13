@@ -1,15 +1,27 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { CheckCircle2, FileCog, FileSearch, LockKeyhole, Sparkles } from 'lucide-react'
+import { CheckCircle2, FileCheck2, LockKeyhole, UploadCloud } from 'lucide-react'
 import { useSessionQuery } from '@/entities/auth/queries'
 import { hasRequiredInternalEmail } from '@/app/config/routes'
-import type { DocumentLifecycleStatus, ProcessingStatus, VisibilityScope } from '@/entities/documents/types'
+import type { VisibilityScope } from '@/entities/documents/types'
 import { useFileUploadMutation, useTextUploadMutation, useUrlUploadMutation } from '@/entities/submissions/queries'
-import type { Submission, UploadSourceType } from '@/entities/submissions/types'
+import type { UploadSourceType } from '@/entities/submissions/types'
 import { parseTagInput, validateUploadDraft, type UploadDraftFormValues } from '@/features/uploads/schema'
-import { formatDateTime, formatPercent } from '@/shared/lib/format'
-import { Badge, Button, Card, Checkbox, FileDropzone, Input, MetadataField, Select, StatusTimeline, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from '@/shared/ui'
+import { formatDateTime } from '@/shared/lib/format'
+import {
+    Badge,
+    Button,
+    Card,
+    Checkbox,
+    FileDropzone,
+    Input,
+    Select,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+    Textarea,
+} from '@/shared/ui'
 
 const defaultValues: UploadDraftFormValues = {
     sourceType: 'file',
@@ -26,132 +38,29 @@ const defaultValues: UploadDraftFormValues = {
 }
 
 const visibilityOptions = [
-    { value: 'internal', label: 'Internal only' },
-    { value: 'public', label: 'Public after approval' },
+    { value: 'internal', label: 'Chỉ nội bộ' },
+    { value: 'public', label: 'Công khai sau duyệt' },
 ] satisfies Array<{ value: VisibilityScope; label: string }>
 
-const sourceGuidance: Record<UploadSourceType, { title: string; description: string; rules: string[] }> = {
+const sourceHints: Record<UploadSourceType, { title: string; description: string }> = {
     file: {
-        title: 'Document upload',
-        description: 'Best for official PDFs, scanned notices and structured handbooks.',
-        rules: [
-            'Use the latest official file from faculty or university channels.',
-            'OCR and temporal extraction will run after upload.',
-            'Public visibility still requires reviewer approval.',
-        ],
+        title: 'Tệp chính thức',
+        description: 'Dùng cho PDF, DOCX hoặc văn bản đã có file gốc.',
     },
     text: {
-        title: 'Bulletin text',
-        description: 'Best for quick notices copied from internal announcements before the source file arrives.',
-        rules: [
-            'Include the full heading and any effective dates in the pasted text.',
-            'Keep copied sections coherent so extraction can infer document type.',
-            'Reviewer should replace text-only submissions with the source file later if available.',
-        ],
+        title: 'Nội dung văn bản',
+        description: 'Dán trực tiếp thông báo nếu chưa nhận được file chính thức.',
     },
     url: {
-        title: 'Official source URL',
-        description: 'Best for university pages that already host the canonical version of the content.',
-        rules: [
-            'Only submit official UIT or faculty URLs.',
-            'The review queue should confirm the page still matches the intended audience and time range.',
-            'Use public visibility only when the page is safe to cite in student-facing chat.',
-        ],
+        title: 'Liên kết nguồn',
+        description: 'Gắn link trang UIT hoặc đơn vị trực thuộc đang lưu bản gốc.',
     },
-}
-
-function mapProcessingState(status?: ProcessingStatus) {
-    switch (status) {
-        case 'failed':
-            return 'failed' as const
-        case 'completed':
-            return 'done' as const
-        case 'extracting':
-        case 'indexing':
-        case 'uploading':
-            return 'current' as const
-        default:
-            return 'pending' as const
-    }
-}
-
-function mapReviewState(status?: DocumentLifecycleStatus) {
-    switch (status) {
-        case 'approved':
-            return 'done' as const
-        case 'rejected':
-            return 'failed' as const
-        case 'pending_review':
-            return 'current' as const
-        default:
-            return 'pending' as const
-    }
-}
-
-function getReadinessTone(score: number) {
-    if (score >= 4) {
-        return 'success' as const
-    }
-
-    if (score >= 2) {
-        return 'warning' as const
-    }
-
-    return 'danger' as const
-}
-
-function buildTimeline(
-    sourceType: UploadSourceType,
-    sourceReady: boolean,
-    visibilityScope: VisibilityScope,
-    latestSubmission?: Submission,
-) {
-    const sourceLabel =
-        sourceType === 'file' ? 'Official file attached' : sourceType === 'text' ? 'Bulletin text prepared' : 'Source URL linked'
-
-    return [
-        {
-            id: 'source',
-            label: sourceLabel,
-            description: sourceReady ? 'Draft has enough source material for submission.' : 'Complete the source step before sending for review.',
-            state: sourceReady ? ('done' as const) : ('current' as const),
-        },
-        {
-            id: 'extraction',
-            label: 'Temporal extraction',
-            description: latestSubmission
-                ? `${latestSubmission.temporal.documentType} detected with ${formatPercent(latestSubmission.temporal.confidence)} confidence.`
-                : 'System will infer document type, temporal metadata and diagnostics.',
-            state: mapProcessingState(latestSubmission?.processingStatus),
-        },
-        {
-            id: 'review',
-            label: 'Human approval',
-            description: latestSubmission
-                ? `Submission is ${latestSubmission.lifecycleStatus.replace('_', ' ')} in the internal review queue.`
-                : 'Operator review is required before any document becomes trusted in chat.',
-            state: mapReviewState(latestSubmission?.lifecycleStatus),
-        },
-        {
-            id: 'publish',
-            label: 'Visibility release',
-            description:
-                visibilityScope === 'public'
-                    ? 'Approved document can be promoted to student-facing chat and public search.'
-                    : 'Approved document remains restricted to internal staff and operators.',
-            state:
-                latestSubmission?.lifecycleStatus === 'approved'
-                    ? ('done' as const)
-                    : latestSubmission?.lifecycleStatus === 'rejected'
-                      ? ('failed' as const)
-                      : ('pending' as const),
-        },
-    ]
 }
 
 export function UploadWorkspace({ scenario }: { scenario?: string }) {
     const sessionQuery = useSessionQuery({ scenario })
     const [files, setFiles] = useState<File[]>([])
+    const [progressValue, setProgressValue] = useState(0)
     const {
         register,
         handleSubmit,
@@ -169,8 +78,6 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
     const title = watch('title')
     const issuingUnit = watch('issuingUnit')
     const visibilityScope = watch('visibilityScope')
-    const tagsInput = watch('tagsInput')
-    const notes = watch('notes')
     const confirmOwnership = watch('confirmOwnership')
     const confirmReviewReady = watch('confirmReviewReady')
     const rawText = watch('rawText')
@@ -183,22 +90,42 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
     const uploadError = fileUpload.error ?? textUpload.error ?? urlUpload.error
     const isSubmitting = fileUpload.isPending || textUpload.isPending || urlUpload.isPending
 
-    const tags = useMemo(() => parseTagInput(tagsInput), [tagsInput])
+    useEffect(() => {
+        if (!isSubmitting) {
+            setProgressValue(latestSubmission ? 100 : 0)
+            return
+        }
+
+        setProgressValue((current) => (current > 6 ? current : 12))
+        const timer = window.setInterval(() => {
+            setProgressValue((current) => (current >= 92 ? current : current + 8))
+        }, 220)
+
+        return () => window.clearInterval(timer)
+    }, [isSubmitting, latestSubmission])
+
     const sourceReady =
         sourceType === 'file' ? files.length > 0 : sourceType === 'text' ? rawText.trim().length >= 80 : Boolean(url.trim())
     const readinessScore = [Boolean(title.trim()), sourceReady, Boolean(issuingUnit.trim()), confirmOwnership, confirmReviewReady].filter(Boolean).length
-    const readinessTone = getReadinessTone(readinessScore)
-    const timelineSteps = useMemo(
-        () => buildTimeline(sourceType, sourceReady, visibilityScope, latestSubmission),
-        [latestSubmission, sourceReady, sourceType, visibilityScope],
-    )
     const uploader = sessionQuery.data?.user
-    const isGmAccount = uploader ? hasRequiredInternalEmail(uploader.role, uploader.email) : false
-    const currentGuidance = sourceGuidance[sourceType]
+    const isUitAccount = uploader ? hasRequiredInternalEmail(uploader.role, uploader.email) : false
+    const currentSourceHint = sourceHints[sourceType]
+
+    const checklist = useMemo(
+        () => [
+            { label: 'Nguồn tài liệu', done: sourceReady },
+            { label: 'Tiêu đề', done: Boolean(title.trim()) },
+            { label: 'Đơn vị ban hành', done: Boolean(issuingUnit.trim()) },
+            { label: 'Xác nhận quyền sở hữu', done: confirmOwnership },
+            { label: 'Sẵn sàng cho hàng duyệt', done: confirmReviewReady },
+        ],
+        [confirmOwnership, confirmReviewReady, issuingUnit, sourceReady, title],
+    )
 
     const resetDraft = () => {
         reset(defaultValues)
         setFiles([])
+        setProgressValue(0)
     }
 
     const submitDraft = handleSubmit(async (values) => {
@@ -225,15 +152,17 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
             title: result.data.title,
             issuingUnit: result.data.issuingUnit,
             visibilityScope: result.data.visibilityScope,
-            tags: result.data.tags,
+            tags: parseTagInput(values.tagsInput),
             notes: result.data.notes,
         }
 
         try {
             if (result.data.sourceType === 'file') {
+                const selectedFile = files[0]
                 await fileUpload.mutateAsync({
                     ...basePayload,
-                    fileName: files[0]?.name,
+                    file: selectedFile,
+                    fileName: selectedFile?.name,
                 })
                 setFiles([])
                 setValue('fileCount', 0)
@@ -255,62 +184,46 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                 setValue('url', '')
             }
         } catch {
-            // Expected mock/API errors are surfaced through mutation state and rendered in the workspace banner.
+            // Mutation state already surfaces the error.
         }
     })
 
     return (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
-            <div className="space-y-6">
-                <Card className="space-y-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Badge tone="brand">Lecturer intake</Badge>
-                                <Badge tone={readinessTone}>Draft readiness {readinessScore}/5</Badge>
-                            </div>
-                            <h2 className="text-xl font-semibold text-gray-950 dark:text-white">Prepare a submission for reviewer approval</h2>
-                            <p className="text-sm text-gray-500">
-                                This flow stays aligned with the current temporal metadata contract. Time fields remain optional and reviewers only
-                                confirm them when the source supports it.
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <Card className="space-y-6">
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-[1.5rem] border border-gray-200 bg-white/88 p-4 dark:border-gray-800 dark:bg-[#101a2c]">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Người tải lên</div>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            {uploader ? `${uploader.name} · ${uploader.email}` : 'Đang kiểm tra phiên đăng nhập...'}
+                        </p>
+                        {uploader ? (
+                            <p className="mt-1 text-xs text-gray-500">
+                                {isUitAccount
+                                    ? 'Email trường hợp lệ cho role hiện tại.'
+                                    : 'Role này yêu cầu đăng nhập Google bằng email trường @gm.uit.edu.vn.'}
                             </p>
-                        </div>
-                        <Button asChild variant="secondary">
-                            <Link to="/portal/submissions">View submission queue</Link>
-                        </Button>
+                        ) : null}
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-900 dark:bg-brand-950">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-brand-800 dark:text-brand-200">
-                                <LockKeyhole size={16} />
-                                Internal account rule
-                            </div>
-                            <p className="mt-2 text-sm text-brand-700 dark:text-brand-300">
-                                Lecturer, operator and admin uploads must come from an internal account ending with `@gm.uit.edu.vn`.
-                            </p>
+                    <div className="rounded-[1.5rem] border border-brand-200 bg-brand-50/80 p-4 dark:border-brand-900 dark:bg-brand-950/35">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-brand-800 dark:text-brand-200">
+                            <LockKeyhole size={16} />
+                            Chính sách tải nội bộ
                         </div>
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">Current uploader</div>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                                {uploader ? `${uploader.name} - ${uploader.email}` : 'Loading session...'}
-                            </p>
-                            {uploader ? (
-                                <p className="mt-1 text-xs text-gray-500">
-                                    {isGmAccount ? 'Eligible for internal upload workflow.' : 'Role is authenticated but does not match the internal mail rule.'}
-                                </p>
-                            ) : null}
-                        </div>
+                        <p className="mt-2 text-sm leading-6 text-brand-700 dark:text-brand-300">
+                            Teacher và admin phải đăng nhập bằng Google Workspace UIT với email đuôi `@gm.uit.edu.vn`, sau đó tài liệu mới đi vào hàng duyệt.
+                        </p>
                     </div>
-                </Card>
+                </div>
 
-                <Card className="space-y-5">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                            <FileCog size={16} />
-                            Source intake
-                        </div>
-                        <p className="text-sm text-gray-500">{currentGuidance.description}</p>
+                <form className="space-y-6" onSubmit={(event) => void submitDraft(event)}>
+                    <input type="hidden" {...register('fileCount', { valueAsNumber: true })} />
+                    <input type="hidden" {...register('tagsInput')} />
+
+                    <div className="space-y-2">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Nguồn nộp tài liệu</div>
+                        <p className="text-sm text-gray-500">{currentSourceHint.description}</p>
                     </div>
 
                     <Tabs
@@ -321,9 +234,9 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                         }}
                     >
                         <TabsList>
-                            <TabsTrigger value="file">File</TabsTrigger>
-                            <TabsTrigger value="text">Text</TabsTrigger>
-                            <TabsTrigger value="url">URL</TabsTrigger>
+                            <TabsTrigger value="file">Tệp</TabsTrigger>
+                            <TabsTrigger value="text">Văn bản</TabsTrigger>
+                            <TabsTrigger value="url">Liên kết</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="file" className="space-y-3">
@@ -340,8 +253,8 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
 
                         <TabsContent value="text">
                             <Textarea
-                                label="Raw bulletin text"
-                                placeholder="Paste the official notice, including title, issuing unit and effective dates when available..."
+                                label="Nội dung văn bản"
+                                placeholder="Dán nguyên văn thông báo, quyết định hoặc phần mô tả chính cần đưa vào hàng duyệt..."
                                 error={errors.rawText?.message}
                                 {...register('rawText')}
                             />
@@ -349,175 +262,162 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
 
                         <TabsContent value="url">
                             <Input
-                                label="Official source URL"
-                                placeholder="https://uit.edu.vn/..."
+                                label="Liên kết nguồn"
+                                placeholder="https://gm.uit.edu.vn/..."
                                 error={errors.url?.message}
                                 {...register('url')}
                             />
                         </TabsContent>
                     </Tabs>
 
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">{currentGuidance.title}</div>
-                        <ul className="mt-3 space-y-2 text-sm text-gray-500">
-                            {currentGuidance.rules.map((rule) => (
-                                <li key={rule} className="flex items-start gap-2">
-                                    <Sparkles size={14} className="mt-0.5 text-brand-600" />
-                                    <span>{rule}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </Card>
-
-                <Card className="space-y-5">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                            <FileSearch size={16} />
-                            Editorial metadata
-                        </div>
-                        <p className="text-sm text-gray-500">Only collect the fields editors can actually guarantee before extraction. Temporal details remain optional.</p>
-                    </div>
-
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Input label="Submission title" placeholder="Thong bao hoc phi hoc ky 2" error={errors.title?.message} {...register('title')} />
-                        <Input label="Issuing unit" placeholder="Phong Dao tao Dai hoc" error={errors.issuingUnit?.message} {...register('issuingUnit')} />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <Select
-                            label="Visibility target"
-                            options={visibilityOptions}
-                            error={errors.visibilityScope?.message}
-                            {...register('visibilityScope')}
+                        <Input
+                            label="Tiêu đề tài liệu"
+                            placeholder="Ví dụ: Thông báo học phí học kỳ 2"
+                            error={errors.title?.message}
+                            {...register('title')}
                         />
                         <Input
-                            label="Tags"
-                            placeholder="hoc-phi, dang-ky-mon-hoc"
-                            hint="Comma-separated labels help reviewers route the document faster."
-                            error={errors.tagsInput?.message}
-                            {...register('tagsInput')}
+                            label="Đơn vị ban hành"
+                            placeholder="Ví dụ: Phòng Đào tạo Đại học"
+                            error={errors.issuingUnit?.message}
+                            {...register('issuingUnit')}
                         />
                     </div>
 
-                    <Textarea
-                        label="Reviewer notes"
-                        placeholder="Optional context for the reviewer, for example which student group should see this first."
-                        error={errors.notes?.message}
-                        {...register('notes')}
-                    />
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">Checklist before submit</div>
-                            <div className="mt-4 space-y-3">
-                                <Checkbox
-                                    label="I confirm this source comes from an official UIT or faculty channel."
-                                    hint="Required for every lecturer submission."
-                                    checked={confirmOwnership}
-                                    onChange={(event) => {
-                                        setValue('confirmOwnership', event.target.checked, { shouldDirty: true })
-                                        clearErrors('confirmOwnership')
-                                    }}
-                                />
-                                {errors.confirmOwnership ? <p className="text-xs font-medium text-error-600">{errors.confirmOwnership.message}</p> : null}
-                                <Checkbox
-                                    label="I understand the document enters a human review queue before it becomes trusted."
-                                    hint="Public visibility never skips operator approval."
-                                    checked={confirmReviewReady}
-                                    onChange={(event) => {
-                                        setValue('confirmReviewReady', event.target.checked, { shouldDirty: true })
-                                        clearErrors('confirmReviewReady')
-                                    }}
-                                />
-                                {errors.confirmReviewReady ? <p className="text-xs font-medium text-error-600">{errors.confirmReviewReady.message}</p> : null}
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">Draft snapshot</div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                <Badge tone="neutral">{sourceType}</Badge>
-                                <Badge tone={visibilityScope === 'public' ? 'brand' : 'neutral'}>{visibilityScope}</Badge>
-                                {tags.slice(0, 4).map((tag) => (
-                                    <Badge key={tag} tone="warning">
-                                        {tag}
-                                    </Badge>
-                                ))}
-                                {tags.length === 0 ? <Badge tone="neutral">No tags yet</Badge> : null}
-                            </div>
-                            <p className="mt-4 text-sm text-gray-500">
-                                Notes length: {notes.trim().length} characters. Reviewers will still rely on extracted `document_type`, confidence and reasoning.
-                            </p>
-                        </div>
+                    <div className="grid gap-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+                        <Select
+                            label="Phạm vi hiển thị"
+                            options={visibilityOptions}
+                            error={errors.visibilityScope?.message}
+                            value={visibilityScope}
+                            {...register('visibilityScope')}
+                        />
+                        <Textarea
+                            label="Ghi chú cho người duyệt"
+                            placeholder="Thêm bối cảnh ngắn gọn nếu tài liệu cần ưu tiên, cần rà ngày hiệu lực hoặc cần công khai cho sinh viên."
+                            error={errors.notes?.message}
+                            {...register('notes')}
+                        />
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-3">
-                        {uploadError ? (
-                            <div className="mr-auto rounded-xl border border-error-200 bg-error-50 px-3 py-2 text-xs text-error-700 dark:border-error-800 dark:bg-error-950 dark:text-error-300">
-                                {uploadError.message}
-                            </div>
-                        ) : null}
-                        <Button variant="ghost" onClick={resetDraft} type="button">
-                            Reset draft
+                    <div className="space-y-3 rounded-[1.5rem] border border-gray-200 bg-white/88 p-4 dark:border-gray-800 dark:bg-[#101a2c]">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Xác nhận trước khi gửi</div>
+                        <Checkbox
+                            label="Đây là nguồn chính thức của UIT hoặc đơn vị trực thuộc."
+                            hint="Bắt buộc để tài liệu đi vào hàng duyệt."
+                            checked={confirmOwnership}
+                            onChange={(event) => {
+                                setValue('confirmOwnership', event.target.checked, { shouldDirty: true })
+                                clearErrors('confirmOwnership')
+                            }}
+                        />
+                        {errors.confirmOwnership ? <p className="text-xs font-medium text-error-600">{errors.confirmOwnership.message}</p> : null}
+
+                        <Checkbox
+                            label="Tài liệu đã sẵn sàng để admin rà soát."
+                            hint="Tiêu đề, nguồn và đơn vị ban hành cần rõ ràng trước khi gửi."
+                            checked={confirmReviewReady}
+                            onChange={(event) => {
+                                setValue('confirmReviewReady', event.target.checked, { shouldDirty: true })
+                                clearErrors('confirmReviewReady')
+                            }}
+                        />
+                        {errors.confirmReviewReady ? <p className="text-xs font-medium text-error-600">{errors.confirmReviewReady.message}</p> : null}
+                    </div>
+
+                    {uploadError ? (
+                        <div className="rounded-2xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-900 dark:bg-error-950/40 dark:text-error-200">
+                            {uploadError.message}
+                        </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Button type="button" variant="secondary" onClick={resetDraft}>
+                            Xóa nháp
                         </Button>
-                        <Button isLoading={isSubmitting} onClick={submitDraft} type="button">
-                            Submit for review
+                        <Button type="submit" isLoading={isSubmitting}>
+                            <UploadCloud size={16} />
+                            Gửi tài liệu
                         </Button>
                     </div>
-                </Card>
-            </div>
+                </form>
+            </Card>
 
-            <div className="space-y-6">
-                <Card className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
-                        <CheckCircle2 size={16} />
-                        Approval timeline
-                    </div>
-                    <StatusTimeline steps={timelineSteps} />
-                </Card>
-
+            <div className="space-y-4">
                 <Card className="space-y-4">
                     <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <div className="text-sm font-semibold text-gray-900 dark:text-white">Latest extraction result</div>
-                            <p className="mt-1 text-sm text-gray-500">
-                                The system fills mandatory temporal metadata even when the source has weak date signals.
-                            </p>
-                        </div>
-                        <Badge tone={latestSubmission ? 'success' : 'neutral'}>{latestSubmission ? latestSubmission.processingStatus : 'not submitted'}</Badge>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Tiến độ xử lý</div>
+                        <Badge tone={readinessScore >= 4 ? 'success' : readinessScore >= 2 ? 'warning' : 'neutral'}>
+                            Sẵn sàng {readinessScore}/5
+                        </Badge>
                     </div>
 
-                    <div className="grid gap-3">
-                        <MetadataField label="Document type" value={latestSubmission?.temporal.documentType ?? 'other'} />
-                        <MetadataField
-                            label="Extraction confidence"
-                            value={latestSubmission ? formatPercent(latestSubmission.temporal.confidence) : 'Pending extraction'}
-                            hint="`confidence` is always present even when the extractor falls back to defaults."
-                        />
-                        <MetadataField
-                            label="Temporal reasoning"
-                            value={latestSubmission?.temporal.reasoning ?? 'Reasoning will appear after extraction.'}
-                        />
-                        <MetadataField
-                            label="Document number"
-                            value={latestSubmission?.temporal.documentNumber ?? 'Optional, only if detected from source.'}
-                        />
-                        <MetadataField
-                            label="Indexed at"
-                            value={latestSubmission ? formatDateTime(latestSubmission.system.indexedAt) : 'Pending'}
-                        />
-                        <MetadataField label="Version" value={latestSubmission?.system.versionNumber ?? 1} />
+                    <div className="space-y-2">
+                        <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                            <div
+                                className="h-full rounded-full bg-brand-600 transition-all duration-300"
+                                style={{ width: `${progressValue}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span>{isSubmitting ? 'Đang gửi lên hàng duyệt...' : latestSubmission ? 'Đã tạo phiếu nộp' : currentSourceHint.title}</span>
+                            <span>{progressValue}%</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        {checklist.map((item) => (
+                            <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="text-gray-600 dark:text-gray-300">{item.label}</span>
+                                <Badge tone={item.done ? 'success' : 'neutral'}>{item.done ? 'Đạt' : 'Chờ'}</Badge>
+                            </div>
+                        ))}
                     </div>
                 </Card>
 
                 <Card className="space-y-4">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">Submission policy</div>
-                    <div className="space-y-3 text-sm text-gray-500">
-                        <p>`document_type`, `extraction_method`, `confidence` and `reasoning` are always generated by the system.</p>
-                        <p>`valid_from`, `valid_until`, `academic_year`, `cohort_years`, `document_number` and `amends_documents` stay optional.</p>
-                        <p>`file_source`, `indexed_at`, `content_hash`, `is_archived` and `version_number` remain read-only in the UI.</p>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        <FileCheck2 size={16} className="text-brand-600" />
+                        Trạng thái gần nhất
                     </div>
+
+                    {latestSubmission ? (
+                        <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
+                            <div className="rounded-[1.5rem] border border-success-200 bg-success-50/90 p-4 dark:border-success-900 dark:bg-success-950/25">
+                                <div className="flex items-center gap-2 font-semibold text-success-700 dark:text-success-300">
+                                    <CheckCircle2 size={16} />
+                                    Đã tạo phiếu nộp
+                                </div>
+                                <div className="mt-2 text-sm leading-6 text-success-700 dark:text-success-300">{latestSubmission.title}</div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-3">
+                                    <span>Mã phiếu</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{latestSubmission.id}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span>Xử lý</span>
+                                    <span className="font-medium capitalize text-gray-900 dark:text-white">{latestSubmission.processingStatus}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span>Hàng duyệt</span>
+                                    <span className="font-medium capitalize text-gray-900 dark:text-white">{latestSubmission.lifecycleStatus.replace('_', ' ')}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span>Cập nhật</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{formatDateTime(latestSubmission.updatedAt)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2 text-sm leading-6 text-gray-500">
+                            <p>1. Chọn đúng nguồn nộp.</p>
+                            <p>2. Điền tiêu đề và đơn vị ban hành.</p>
+                            <p>3. Xác nhận rồi gửi vào hàng duyệt.</p>
+                        </div>
+                    )}
                 </Card>
             </div>
         </div>

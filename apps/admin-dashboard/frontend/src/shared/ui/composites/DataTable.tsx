@@ -53,8 +53,8 @@ export function DataTable<TData>({
     }
 
     return (
-        <Card className="overflow-hidden p-0">
-            <div className="overflow-x-auto">
+        <Card className="relative z-0 overflow-visible p-0">
+            <div className="overflow-x-auto rounded-[inherit]">
                 <Table>
                     <TableHead>
                         <TableRow>

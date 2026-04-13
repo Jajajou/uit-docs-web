@@ -12,7 +12,8 @@ from fastapi.responses import JSONResponse
 
 from api.config import settings
 from api.errors import ApiServiceError, build_error_response
-from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, upload
+from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, test_support, upload
+from api.security import apply_security_headers, build_https_redirect_response, enforce_trusted_host
 
 
 @asynccontextmanager
@@ -41,14 +42,25 @@ app.add_middleware(
 async def request_id_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid4())
     request.state.request_id = request_id
+
+    try:
+        enforce_trusted_host(request)
+    except ApiServiceError as exc:
+        return apply_security_headers(build_error_response(request, exc))
+
+    redirect = build_https_redirect_response(request)
+    if redirect is not None:
+        redirect.headers["x-request-id"] = request_id
+        return apply_security_headers(redirect)
+
     response = await call_next(request)
     response.headers["x-request-id"] = request_id
-    return response
+    return apply_security_headers(response)
 
 
 @app.exception_handler(ApiServiceError)
 async def api_service_error_handler(request: Request, exc: ApiServiceError):
-    return build_error_response(request, exc)
+    return apply_security_headers(build_error_response(request, exc))
 
 
 @app.exception_handler(Exception)
@@ -58,7 +70,11 @@ async def unhandled_error_handler(request: Request, exc: Exception):
         content={
             "error": {
                 "code": "unhandled_error",
-                "message": str(exc),
+                "message": (
+                    str(exc)
+                    if settings.TEST_MODE or settings.EXPOSE_ERROR_DETAILS
+                    else "An unexpected server error occurred."
+                ),
                 "status": 500,
                 "requestId": getattr(request.state, "request_id", None),
                 "details": None,
@@ -67,7 +83,7 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     )
     if getattr(request.state, "request_id", None):
         response.headers["x-request-id"] = request.state.request_id
-    return response
+    return apply_security_headers(response)
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
@@ -80,6 +96,7 @@ app.include_router(reviews.router, prefix="/api/reviews", tags=["Reviews"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(test_support.router, prefix="/api/test", tags=["Test Support"])
 
 
 @app.get("/health")

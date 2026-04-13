@@ -24,6 +24,7 @@ async def list_documents(
     return {
         "documents": service.list_documents(
             context.scenario,
+            role=context.role,
             search=search,
             lifecycle_status=lifecycle_status,
             visibility_scope=visibility_scope,
@@ -37,13 +38,13 @@ async def get_document(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    return {"document": service.get_document(doc_id, context.scenario)}
+    return {"document": service.get_document(doc_id, context.scenario, context.role)}
 
 
 @router.post("/{doc_id}/archive", response_model=DocumentResponse)
 async def archive_document(
     doc_id: str,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"document": service.archive_document(doc_id, context.role)}
@@ -52,7 +53,7 @@ async def archive_document(
 @router.post("/{doc_id}/reindex", response_model=DocumentResponse)
 async def reindex_document(
     doc_id: str,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"document": service.reindex_document(doc_id, context.role)}

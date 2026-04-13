@@ -34,12 +34,12 @@ export const submissionFixtures: SubmissionDto[] = [
             issuing_unit: 'Phong Dao tao Dai hoc',
             tags: ['hoc-phi', 'thu-tuc'],
             visibility_scope: 'internal',
-            notes: 'Uploaded by lecturer pending review.',
+            notes: 'Uploaded by teacher pending review.',
         },
         traceability: {
             review_task_id: 'review-001',
             published_document_id: null,
-            reviewed_by_name: 'Le Thi Operator',
+            reviewed_by_name: 'Tran Van Admin',
             published_at: null,
             publication_reason: 'Waiting for cohort confirmation before publication.',
         },
@@ -82,7 +82,7 @@ export const submissionFixtures: SubmissionDto[] = [
         traceability: {
             review_task_id: 'review-002',
             published_document_id: 'doc-004',
-            reviewed_by_name: 'Le Thi Operator',
+            reviewed_by_name: 'Tran Van Admin',
             published_at: '2026-03-17T05:33:00.000Z',
             publication_reason: 'Approved for public student-facing chat after date range verification.',
         },

@@ -16,7 +16,7 @@ router = APIRouter()
 @router.get("", response_model=SubmissionsResponse)
 async def list_submissions(
     lifecycle_status: Annotated[str | None, Query()] = None,
-    context: ApiContext = Depends(require_roles("lecturer", "operator", "admin")),
+    context: ApiContext = Depends(require_roles("teacher", "admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"submissions": service.list_submissions(context.scenario, lifecycle_status=lifecycle_status)}
@@ -25,7 +25,7 @@ async def list_submissions(
 @router.get("/{submission_id}", response_model=SubmissionResponse)
 async def get_submission(
     submission_id: str,
-    context: ApiContext = Depends(require_roles("lecturer", "operator", "admin")),
+    context: ApiContext = Depends(require_roles("teacher", "admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"submission": service.get_submission(submission_id, context.scenario)}

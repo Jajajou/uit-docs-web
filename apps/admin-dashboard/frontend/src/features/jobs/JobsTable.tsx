@@ -71,7 +71,7 @@ export function JobsTable({ scenario }: { scenario?: string }) {
                 <Card className="space-y-2 border-warning-200 bg-warning-50 dark:border-warning-800 dark:bg-warning-950">
                     <div className="text-sm font-semibold text-warning-900 dark:text-warning-100">Break-glass support mode</div>
                     <p className="text-sm text-warning-800 dark:text-warning-200">
-                        Job retry remains an operator-owned remediation flow. As `admin`, you are using an audited support override intended for incident recovery only.
+                            Job retry remains an admin-owned remediation flow and stays visible in audit history for incident recovery.
                     </p>
                 </Card>
             ) : null}

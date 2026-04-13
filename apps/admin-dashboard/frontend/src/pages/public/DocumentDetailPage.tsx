@@ -11,8 +11,8 @@ export default function DocumentDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Document detail"
-                description="Public-facing trust detail for citations, provenance, visibility and assistant usage readiness."
+                title="Chi tiết tài liệu"
+                description="Thông tin tóm tắt của tài liệu được dùng làm nguồn tham chiếu trong UIT AI."
                 icon={FileSearch}
             />
             <DocumentDetailPanel id={id} scenario={scenario} />

@@ -6,14 +6,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Role = Literal["guest", "student", "lecturer", "operator", "admin"]
+Role = Literal["guest", "student", "teacher", "admin"]
 DocumentLifecycleStatus = Literal["draft", "pending_review", "approved", "rejected", "archived"]
 ProcessingStatus = Literal["pending", "uploading", "extracting", "indexing", "completed", "failed"]
 VisibilityScope = Literal["public", "internal"]
 UploadSourceType = Literal["file", "text", "url"]
-AdminShellScope = Literal["public", "auth", "portal", "admin", "system"]
+AdminShellScope = Literal["public", "app", "auth", "admin", "system"]
 AdminUserStatus = Literal["active", "invited", "suspended"]
-AdminUserScope = Literal["student_portal", "contributor_portal", "operator_portal", "admin_console"]
+AdminUserScope = Literal["student_portal", "teacher_workspace", "admin_console"]
 SystemSettingGroup = Literal["auth", "ingestion", "publication", "chat"]
 SystemSettingSource = Literal["derived_contract", "mock_policy"]
 AuditActionType = Literal[

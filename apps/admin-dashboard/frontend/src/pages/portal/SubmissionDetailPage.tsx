@@ -12,7 +12,7 @@ export default function SubmissionDetailPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Submission detail"
-                description="Bridge lecturer upload context with reviewer handoff, extraction diagnostics and publication readiness."
+            description="Bridge teacher upload context with reviewer handoff, extraction diagnostics and publication readiness."
                 icon={FileStack}
             />
             <SubmissionDetailPanel id={id} scenario={scenario} />

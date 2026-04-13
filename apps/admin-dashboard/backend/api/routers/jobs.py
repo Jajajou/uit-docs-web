@@ -17,7 +17,7 @@ router = APIRouter()
 async def list_jobs(
     status: Annotated[str | None, Query()] = None,
     job_type: Annotated[str | None, Query(alias="type")] = None,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"jobs": service.list_jobs(context.scenario, status=status, job_type=job_type)}
@@ -26,7 +26,7 @@ async def list_jobs(
 @router.post("/{job_id}/retry", response_model=RetryJobResponse)
 async def retry_job(
     job_id: str,
-    context: ApiContext = Depends(require_roles("operator", "admin")),
+    context: ApiContext = Depends(require_roles("admin")),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
     return {"job": service.retry_job(job_id), "retry_accepted": True}

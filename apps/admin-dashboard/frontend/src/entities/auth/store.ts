@@ -14,7 +14,7 @@ interface SessionState {
 export const useSessionStore = create<SessionState>()(
     persist(
         (set) => ({
-            selectedRole: 'guest',
+            selectedRole: 'student',
             bootstrapRequest: null,
             setRole: (role) => set({ selectedRole: role }),
             beginBootstrap: (role, returnTo = null) =>

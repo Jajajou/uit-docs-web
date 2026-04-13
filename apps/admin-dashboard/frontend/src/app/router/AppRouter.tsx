@@ -4,54 +4,29 @@ import { Route, Routes } from 'react-router-dom'
 import { RouteGuard } from '@/app/guards/RouteGuard'
 import RouteLoadingFallback from '@/app/router/RouteLoadingFallback'
 import {
-    loadAdminLayout,
-    loadAuditLogsPage,
-    loadAuthCallbackPage,
+    loadAppLayout,
     loadAuthLayout,
     loadChatPage,
     loadDocumentDetailPage,
-    loadForbiddenPage,
-    loadHomePage,
-    loadJobsPage,
-    loadLibraryPage,
     loadLoginPage,
-    loadNotFoundPage,
-    loadPortalLayout,
-    loadPortalOverviewPage,
-    loadPublicLayout,
-    loadReviewPage,
-    loadRolesPage,
-    loadSettingsPage,
-    loadSubmissionDetailPage,
-    loadSubmissionsPage,
+    loadAuthCallbackPage,
     loadUploadPage,
-    loadUsersPage,
+    loadManagerPage,
+    loadForbiddenPage,
+    loadNotFoundPage,
 } from '@/app/router/routeModules'
 
-const PublicLayout = lazy(loadPublicLayout)
+const AppLayout = lazy(loadAppLayout)
 const AuthLayout = lazy(loadAuthLayout)
-const PortalLayout = lazy(loadPortalLayout)
-const AdminLayout = lazy(loadAdminLayout)
 
-const HomePage = lazy(loadHomePage)
 const ChatPage = lazy(loadChatPage)
 const DocumentDetailPage = lazy(loadDocumentDetailPage)
 
 const LoginPage = lazy(loadLoginPage)
 const AuthCallbackPage = lazy(loadAuthCallbackPage)
 
-const PortalOverviewPage = lazy(loadPortalOverviewPage)
 const UploadPage = lazy(loadUploadPage)
-const SubmissionsPage = lazy(loadSubmissionsPage)
-const SubmissionDetailPage = lazy(loadSubmissionDetailPage)
-const ReviewPage = lazy(loadReviewPage)
-const LibraryPage = lazy(loadLibraryPage)
-const JobsPage = lazy(loadJobsPage)
-
-const UsersPage = lazy(loadUsersPage)
-const RolesPage = lazy(loadRolesPage)
-const SettingsPage = lazy(loadSettingsPage)
-const AuditLogsPage = lazy(loadAuditLogsPage)
+const ManagerPage = lazy(loadManagerPage)
 
 const ForbiddenPage = lazy(loadForbiddenPage)
 const NotFoundPage = lazy(loadNotFoundPage)
@@ -60,39 +35,25 @@ export default function AppRouter() {
     return (
         <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
-                <Route element={<PublicLayout />}>
-                    <Route path="/" element={<HomePage />} />
+                <Route element={<AppLayout />}>
+                    <Route path="/" element={<ChatPage />} />
                     <Route path="/chat" element={<ChatPage />} />
                     <Route path="/documents/:id" element={<DocumentDetailPage />} />
+
+                    {/* Guarded App Routes */}
+                    <Route element={<RouteGuard allowedRoles={['teacher', 'admin']} />}>
+                        <Route path="/knowledge" element={<UploadPage />} />
+                        <Route path="/upload" element={<UploadPage />} />
+                    </Route>
+
+                    <Route element={<RouteGuard allowedRoles={['admin']} />}>
+                        <Route path="/manager" element={<ManagerPage />} />
+                    </Route>
                 </Route>
 
                 <Route element={<AuthLayout />}>
                     <Route path="/auth/login" element={<LoginPage />} />
                     <Route path="/auth/callback" element={<AuthCallbackPage />} />
-                </Route>
-
-                <Route path="/portal" element={<PortalLayout />}>
-                    <Route element={<RouteGuard allowedRoles={['lecturer', 'operator', 'admin']} />}>
-                        <Route index element={<PortalOverviewPage />} />
-                        <Route path="upload" element={<UploadPage />} />
-                        <Route path="submissions" element={<SubmissionsPage />} />
-                        <Route path="submissions/:id" element={<SubmissionDetailPage />} />
-                    </Route>
-
-                    <Route element={<RouteGuard allowedRoles={['operator', 'admin']} />}>
-                        <Route path="review" element={<ReviewPage />} />
-                        <Route path="library" element={<LibraryPage />} />
-                        <Route path="jobs" element={<JobsPage />} />
-                    </Route>
-                </Route>
-
-                <Route path="/admin" element={<AdminLayout />}>
-                    <Route element={<RouteGuard allowedRoles={['admin']} />}>
-                        <Route path="users" element={<UsersPage />} />
-                        <Route path="roles" element={<RolesPage />} />
-                        <Route path="settings" element={<SettingsPage />} />
-                        <Route path="audit-logs" element={<AuditLogsPage />} />
-                    </Route>
                 </Route>
 
                 <Route path="/403" element={<ForbiddenPage />} />

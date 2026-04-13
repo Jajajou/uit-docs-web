@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/client'
+import { serializeRole } from '@/entities/auth/roles'
 import { mapSessionDtoToSession, mapSsoProviderMetadataDto } from '@/entities/auth/mappers'
 import type { Role, Session, SessionDto, SsoProviderMetadata, SsoProviderMetadataDto } from '@/entities/auth/types'
 
@@ -13,7 +14,7 @@ export async function getSession(params?: { scenario?: string }): Promise<Sessio
 export async function bootstrapSession(role: Role, params?: { scenario?: string }): Promise<Session> {
     const response = await apiClient.post<SessionDto>(
         '/auth/bootstrap',
-        { role },
+        { role: serializeRole(role) },
         {
             params,
         },

@@ -66,3 +66,7 @@ export interface UploadMutationPayload {
     tags: string[]
     notes: string
 }
+
+export interface FileUploadMutationPayload extends UploadMutationPayload {
+    file?: File
+}

@@ -1,27 +1,14 @@
-export const loadPublicLayout = () => import('@/layouts/PublicLayout')
+export const loadAppLayout = () => import('@/layouts/AppLayout')
 export const loadAuthLayout = () => import('@/layouts/AuthLayout')
-export const loadPortalLayout = () => import('@/layouts/PortalLayout')
-export const loadAdminLayout = () => import('@/layouts/AdminLayout')
 
-export const loadHomePage = () => import('@/pages/public/HomePage')
 export const loadChatPage = () => import('@/pages/public/ChatPage')
 export const loadDocumentDetailPage = () => import('@/pages/public/DocumentDetailPage')
 
 export const loadLoginPage = () => import('@/pages/auth/LoginPage')
 export const loadAuthCallbackPage = () => import('@/pages/auth/AuthCallbackPage')
 
-export const loadPortalOverviewPage = () => import('@/pages/portal/PortalOverviewPage')
 export const loadUploadPage = () => import('@/pages/portal/UploadPage')
-export const loadSubmissionsPage = () => import('@/pages/portal/SubmissionsPage')
-export const loadSubmissionDetailPage = () => import('@/pages/portal/SubmissionDetailPage')
-export const loadReviewPage = () => import('@/pages/portal/ReviewPage')
-export const loadLibraryPage = () => import('@/pages/portal/LibraryPage')
-export const loadJobsPage = () => import('@/pages/portal/JobsPage')
-
-export const loadUsersPage = () => import('@/pages/admin/UsersPage')
-export const loadRolesPage = () => import('@/pages/admin/RolesPage')
-export const loadSettingsPage = () => import('@/pages/admin/SettingsPage')
-export const loadAuditLogsPage = () => import('@/pages/admin/AuditLogsPage')
+export const loadManagerPage = () => import('@/pages/manager/ManagerPage')
 
 export const loadForbiddenPage = () => import('@/pages/system/ForbiddenPage')
 export const loadNotFoundPage = () => import('@/pages/system/NotFoundPage')
@@ -43,89 +30,24 @@ const preloadCache = new Map<string, Promise<unknown>>()
 
 const routePreloaders: RoutePreloader[] = [
     {
-        key: 'public-home',
-        matches: (pathname) => pathname === '/',
-        load: () => Promise.all([loadPublicLayout(), loadHomePage()]),
+        key: 'app-chat',
+        matches: (pathname) => pathname === '/' || pathname === '/chat',
+        load: () => Promise.all([loadAppLayout(), loadChatPage()]),
     },
     {
-        key: 'public-chat',
-        matches: (pathname) => pathname === '/chat',
-        load: () => Promise.all([loadPublicLayout(), loadChatPage()]),
+        key: 'app-upload',
+        matches: (pathname) => pathname === '/upload' || pathname === '/knowledge',
+        load: () => Promise.all([loadAppLayout(), loadUploadPage()]),
     },
     {
-        key: 'public-document-detail',
-        matches: (pathname) => pathname.startsWith('/documents/'),
-        load: () => Promise.all([loadPublicLayout(), loadDocumentDetailPage()]),
+        key: 'app-manager',
+        matches: (pathname) => pathname === '/manager',
+        load: () => Promise.all([loadAppLayout(), loadManagerPage()]),
     },
     {
         key: 'auth-login',
         matches: (pathname) => pathname === '/auth/login',
         load: () => Promise.all([loadAuthLayout(), loadLoginPage()]),
-    },
-    {
-        key: 'auth-callback',
-        matches: (pathname) => pathname === '/auth/callback',
-        load: () => Promise.all([loadAuthLayout(), loadAuthCallbackPage()]),
-    },
-    {
-        key: 'portal-overview',
-        matches: (pathname) => pathname === '/portal',
-        load: () => Promise.all([loadPortalLayout(), loadPortalOverviewPage()]),
-    },
-    {
-        key: 'portal-upload',
-        matches: (pathname) => pathname === '/portal/upload',
-        load: () => Promise.all([loadPortalLayout(), loadUploadPage()]),
-    },
-    {
-        key: 'portal-submissions',
-        matches: (pathname) => pathname === '/portal/submissions',
-        load: () => Promise.all([loadPortalLayout(), loadSubmissionsPage()]),
-    },
-    {
-        key: 'portal-submission-detail',
-        matches: (pathname) => pathname.startsWith('/portal/submissions/'),
-        load: () => Promise.all([loadPortalLayout(), loadSubmissionDetailPage()]),
-    },
-    {
-        key: 'portal-review',
-        matches: (pathname) => pathname === '/portal/review',
-        load: () => Promise.all([loadPortalLayout(), loadReviewPage()]),
-    },
-    {
-        key: 'portal-library',
-        matches: (pathname) => pathname === '/portal/library',
-        load: () => Promise.all([loadPortalLayout(), loadLibraryPage()]),
-    },
-    {
-        key: 'portal-jobs',
-        matches: (pathname) => pathname === '/portal/jobs',
-        load: () => Promise.all([loadPortalLayout(), loadJobsPage()]),
-    },
-    {
-        key: 'admin-users',
-        matches: (pathname) => pathname === '/admin/users',
-        load: () => Promise.all([loadAdminLayout(), loadUsersPage()]),
-    },
-    {
-        key: 'admin-roles',
-        matches: (pathname) => pathname === '/admin/roles',
-        load: () => Promise.all([loadAdminLayout(), loadRolesPage()]),
-    },
-    {
-        key: 'admin-settings',
-        matches: (pathname) => pathname === '/admin/settings',
-        load: () => Promise.all([loadAdminLayout(), loadSettingsPage()]),
-    },
-    {
-        key: 'admin-audit-logs',
-        matches: (pathname) => pathname === '/admin/audit-logs',
-        load: () => Promise.all([loadAdminLayout(), loadAuditLogsPage()]),
-    },
-    {
-        key: 'system-forbidden',
-        matches: (pathname) => pathname === '/403',
-        load: loadForbiddenPage,
     },
     {
         key: 'system-not-found',

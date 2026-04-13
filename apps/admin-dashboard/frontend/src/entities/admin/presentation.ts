@@ -15,9 +15,7 @@ export function getAdminRoleTone(role: AdminUser['role']): BadgeTone {
     switch (role) {
         case 'admin':
             return 'danger'
-        case 'operator':
-            return 'brand'
-        case 'lecturer':
+        case 'teacher':
             return 'success'
         case 'student':
             return 'neutral'

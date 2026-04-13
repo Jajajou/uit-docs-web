@@ -8,7 +8,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const inputBaseClassName =
-    'w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white'
+    'w-full rounded-2xl border border-gray-200 bg-white/92 px-4 py-3 text-sm text-gray-900 shadow-theme-xs outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/12 dark:border-gray-700 dark:bg-[#111c2d] dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-500'
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
     ({ className, label, hint, error, id, ...props }, ref) => {
@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         return (
             <label className="flex w-full flex-col gap-1.5" htmlFor={fieldId}>
-                {label ? <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span> : null}
+                {label ? <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{label}</span> : null}
                 <input
                     ref={ref}
                     id={fieldId}

@@ -10,7 +10,7 @@ export default function ReviewPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Review queue"
-                description="Operator-facing decision workspace for validating extraction output and promoting approved submissions into public documents."
+            description="Admin decision workspace for validating extraction output and promoting approved submissions into public documents."
                 icon={ClipboardList}
             />
             <ReviewQueue scenario={scenario} />

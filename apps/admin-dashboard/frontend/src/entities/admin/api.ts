@@ -5,6 +5,7 @@ import {
     mapRolePolicyDtoToRolePolicy,
     mapSystemSettingDtoToSystemSetting,
 } from '@/entities/admin/mappers'
+import { serializeRole } from '@/entities/auth/roles'
 import type {
     AdminUserPatchInput,
     AdminUser,
@@ -51,7 +52,12 @@ export async function getAuditLogs(params?: { scenario?: string }): Promise<Audi
 }
 
 export async function patchAdminUser(id: string, payload: AdminUserPatchInput, params?: { scenario?: string }): Promise<AdminUser> {
-    const response = await apiClient.patch<{ user: AdminUserDto }>(`/admin/users/${id}`, payload, {
+    const requestPayload = {
+        ...payload,
+        role: payload.role ? serializeRole(payload.role) : undefined,
+    }
+
+    const response = await apiClient.patch<{ user: AdminUserDto }>(`/admin/users/${id}`, requestPayload, {
         params,
     })
 

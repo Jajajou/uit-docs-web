@@ -1,4 +1,5 @@
-import { allRoles, canAccessPath, getDefaultPathForRole } from '@/app/config/routes'
+import { canAccessPath, getDefaultPathForRole } from '@/app/config/routes'
+import { isRole } from '@/entities/auth/roles'
 import type { Role } from '@/entities/auth/types'
 
 export interface SessionBootstrapRequest {
@@ -34,8 +35,8 @@ export function buildInternalSsoStartTarget(returnTo?: string | null) {
 export function readBootstrapRole(searchParams: URLSearchParams): Role | null {
     const value = searchParams.get('role')
 
-    if (value && allRoles.includes(value as Role)) {
-        return value as Role
+    if (isRole(value)) {
+        return value
     }
 
     return null
@@ -54,10 +55,6 @@ export function readAuthError(searchParams: URLSearchParams) {
 export function readAuthErrorMessage(searchParams: URLSearchParams) {
     const value = searchParams.get('authErrorMessage')
     return value && value.trim().length > 0 ? value : null
-}
-
-export function isInternalRole(role: Role) {
-    return role === 'lecturer' || role === 'operator' || role === 'admin'
 }
 
 function toAccessPath(pathname: string) {

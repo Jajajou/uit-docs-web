@@ -9,7 +9,9 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from api.config import settings
 from api.dependencies import (
+    INTERNAL_EMAIL_DOMAIN,
     INTERNAL_ROLES,
     SESSION_COOKIE_NAME,
     ApiContext,
@@ -19,6 +21,7 @@ from api.dependencies import (
 )
 from api.errors import ApiServiceError
 from api.schemas import AuthBootstrapRequest, SessionDto, SsoProviderMetadataDto
+from api.security import build_session_cookie_settings, enforce_auth_rate_limit
 from api.services.sso_provider import build_sso_provider_metadata, get_sso_provider_config
 from api.services.workspace_service import InMemoryWorkspaceService
 
@@ -37,6 +40,7 @@ def build_frontend_callback_url(
     auth_error: str | None = None,
     auth_error_message: str | None = None,
 ) -> str:
+    frontend_base_url = settings.SSO_FRONTEND_BASE_URL.rstrip("/")
     params: dict[str, str] = {}
     safe_return_to = normalize_return_to(return_to)
 
@@ -48,22 +52,21 @@ def build_frontend_callback_url(
         params["authErrorMessage"] = auth_error_message
 
     if not params:
-        return "/auth/callback"
+        return f"{frontend_base_url}/auth/callback"
 
-    return f"/auth/callback?{urlencode(params)}"
+    return f"{frontend_base_url}/auth/callback?{urlencode(params)}"
 
 
 def render_sso_provider_emulator(*, state: str, return_to: str | None, provider_name: str) -> str:
     safe_return_to = normalize_return_to(return_to) or "/"
     role_links = [
-        ("Lecturer", f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'lecturer'})}"),
-        ("Operator", f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'operator'})}"),
+        ("Teacher", f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'teacher'})}"),
         ("Admin", f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'admin'})}"),
     ]
     edge_links = [
         (
             "Simulate non-compliant internal email",
-            f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'lecturer', 'scenario': 'non-compliant-internal-email'})}",
+            f"/api/auth/sso/callback?{urlencode({'state': state, 'providerRole': 'teacher', 'scenario': 'non-compliant-internal-email'})}",
         ),
         (
             "Simulate provider access denied",
@@ -142,15 +145,19 @@ async def bootstrap_session(
     scenario: Annotated[str, Query()] = "happy",
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
+    if not settings.ENABLE_DEMO_AUTH:
+        raise ApiServiceError(
+            status_code=404,
+            code="demo_auth_disabled",
+            message="Demo bootstrap is disabled in the current environment.",
+        )
     session = service.get_session(payload.role, scenario)
     ensure_internal_session_compliance(payload.role, session)
-    session_token = service.issue_session_token(payload.role)
+    session_token = service.issue_session_token(payload.role, session=session)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
-        httponly=True,
-        samesite="lax",
-        path="/",
+        **build_session_cookie_settings(),
     )
     return session
 
@@ -162,6 +169,7 @@ async def start_sso(
     scenario: Annotated[str, Query()] = "happy",
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> RedirectResponse:
+    enforce_auth_rate_limit(request, bucket="auth-sso-start")
     sso_state = service.issue_sso_state(normalize_return_to(return_to), scenario)
     provider_config = get_sso_provider_config()
     if not provider_config.configured:
@@ -205,6 +213,7 @@ async def sso_provider(
 
 @router.get("/sso/callback")
 async def sso_callback(
+    request: Request,
     state: Annotated[str, Query()],
     provider_role: Annotated[str | None, Query(alias="providerRole")] = None,
     provider_groups: Annotated[list[str] | None, Query(alias="providerGroup")] = None,
@@ -216,6 +225,7 @@ async def sso_callback(
     error_description: Annotated[str | None, Query(alias="error_description")] = None,
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> RedirectResponse:
+    enforce_auth_rate_limit(request, bucket="auth-sso-callback")
     provider_config = get_sso_provider_config()
     stored_state = service.consume_sso_state(state)
     if stored_state is None:
@@ -240,34 +250,42 @@ async def sso_callback(
             status_code=302,
         )
 
-    if not provider_config.uses_local_emulator and not code and not provider_role and not provider_groups:
-        return RedirectResponse(
-            url=build_frontend_callback_url(
-                return_to=return_to,
-                auth_error="missing_sso_code",
-                auth_error_message="The institutional provider callback did not include an authorization code.",
-            ),
-            status_code=302,
-        )
-
-    role = provider_config.resolve_role(role_hint=provider_role, groups=provider_groups)
-    if role not in INTERNAL_ROLES:
-        return RedirectResponse(
-            url=build_frontend_callback_url(
-                return_to=return_to,
-                auth_error="unauthorized_internal_role",
-                auth_error_message="The authenticated account does not map to an allowed internal role.",
-            ),
-            status_code=302,
-        )
-
     try:
-        session = service.get_session(role, scenario_key)
-        if provider_email:
-            session["user"]["email"] = provider_email
-        if provider_name:
-            session["user"]["name"] = provider_name
-        ensure_internal_session_compliance(role, session)
+        if provider_config.uses_local_emulator:
+            role = provider_config.resolve_role(role_hint=provider_role, groups=provider_groups)
+            if role not in INTERNAL_ROLES:
+                raise ApiServiceError(
+                    status_code=403,
+                    code="unauthorized_internal_role",
+                    message="The authenticated account does not map to an allowed internal role.",
+                )
+
+            session = service.get_session(role, scenario_key)
+            if provider_email:
+                session["user"]["email"] = provider_email
+            if provider_name:
+                session["user"]["name"] = provider_name
+            ensure_internal_session_compliance(role, session)
+            auth_method = "institutional_sso_emulator"
+        else:
+            if not code:
+                raise ApiServiceError(
+                    status_code=400,
+                    code="missing_sso_code",
+                    message="The Google OAuth callback did not include an authorization code.",
+                )
+
+            identity = provider_config.exchange_code_for_identity(code=code, request_base_url=str(request.base_url))
+            if not identity.email.endswith(INTERNAL_EMAIL_DOMAIN):
+                raise ApiServiceError(
+                    status_code=403,
+                    code="unsupported_google_domain",
+                    message=f"Only Google accounts ending with {INTERNAL_EMAIL_DOMAIN} are supported.",
+                )
+
+            role, session = service.build_google_sso_session(identity.email, identity.name)
+            ensure_internal_session_compliance(role, session)
+            auth_method = "google_oauth"
     except ApiServiceError as exc:
         return RedirectResponse(
             url=build_frontend_callback_url(
@@ -278,14 +296,12 @@ async def sso_callback(
             status_code=302,
         )
 
-    session_token = service.issue_session_token(role, auth_method="institutional_sso")
+    session_token = service.issue_session_token(role, auth_method=auth_method, session=session)
     redirect = RedirectResponse(url=build_frontend_callback_url(return_to=return_to), status_code=302)
     redirect.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
-        httponly=True,
-        samesite="lax",
-        path="/",
+        **build_session_cookie_settings(),
     )
     return redirect
 
@@ -297,7 +313,7 @@ async def logout(
 ) -> Response:
     service.revoke_session_token(request.cookies.get(SESSION_COOKIE_NAME))
     response = Response(status_code=204)
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(key=SESSION_COOKIE_NAME, **build_session_cookie_settings())
     return response
 
 
@@ -306,4 +322,4 @@ async def get_me(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    return service.get_session(context.role, context.scenario)
+    return context.session or service.get_session(context.role, context.scenario)

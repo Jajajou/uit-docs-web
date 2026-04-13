@@ -9,8 +9,8 @@ export default function LibraryPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Knowledge library"
-                description="Contract-stable document table for operator and admin review."
+                title="Thư viện tài liệu"
+                description="Danh sách tài liệu đã được hệ thống ghi nhận để tra cứu và rà soát."
                 icon={Library}
             />
             <DocumentLibrary scenario={scenario} />

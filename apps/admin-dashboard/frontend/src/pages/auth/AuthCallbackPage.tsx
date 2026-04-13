@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { LogIn, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Chrome, ShieldCheck } from 'lucide-react'
 import { INTERNAL_EMAIL_DOMAIN } from '@/app/config/routes'
 import {
     buildAuthCallbackTarget,
@@ -14,7 +14,7 @@ import {
 import { useBootstrapSessionMutation, useSessionQuery } from '@/entities/auth/queries'
 import { useSessionStore } from '@/entities/auth/store'
 import { useScenarioParam } from '@/shared/lib/scenario'
-import { Badge, Button, Card, PageHeader } from '@/shared/ui'
+import { Badge, Button, Card } from '@/shared/ui'
 
 export default function AuthCallbackPage() {
     const navigate = useNavigate()
@@ -30,6 +30,7 @@ export default function AuthCallbackPage() {
     const requestedReturnTo = readBootstrapReturnTo(searchParams) ?? bootstrapRequest?.returnTo ?? null
     const authErrorCode = readAuthError(searchParams)
     const authErrorMessage = readAuthErrorMessage(searchParams)
+
     const {
         data: bootstrapSession,
         error: bootstrapError,
@@ -39,6 +40,7 @@ export default function AuthCallbackPage() {
         reset: resetBootstrapMutation,
         status: bootstrapStatus,
     } = useBootstrapSessionMutation({ scenario })
+
     const sessionQuery = useSessionQuery({ scenario, enabled: !hasExplicitBootstrap && !authErrorCode })
     const activeSession = bootstrapSession ?? sessionQuery.data
     const activeError = bootstrapError ?? sessionQuery.error
@@ -67,29 +69,33 @@ export default function AuthCallbackPage() {
             authErrorMessage
                 ? authErrorMessage
                 : hasExplicitBootstrap && !requestedRole
-                ? 'The callback is missing a valid requested role, so the auth shell cannot bootstrap a session.'
-                : activeError instanceof Error
-                  ? activeError.message
-                  : 'The auth shell could not establish the requested session.'
+                  ? 'Thiếu role yêu cầu nên không thể hoàn tất đăng nhập.'
+                  : activeError instanceof Error
+                    ? activeError.message
+                    : 'Không thể hoàn tất callback đăng nhập hiện tại.'
         const retrySso = !hasExplicitBootstrap && authErrorCode
 
         return (
             <div className="space-y-6">
-                <PageHeader
-                    title="Session callback"
-                    description="The auth shell could not establish the requested session from `/api/auth/bootstrap`, complete the backend-owned SSO handoff, or validate `/api/auth/me`."
-                    icon={LogIn}
-                />
+                <div className="space-y-3">
+                    <Badge tone="warning">Đăng nhập chưa hoàn tất</Badge>
+                    <h2 className="text-3xl font-bold tracking-tight text-gray-950 dark:text-white">Không thể xác thực phiên làm việc</h2>
+                    <p className="text-sm leading-7 text-gray-500">
+                        Backend đã từ chối callback do lỗi provider, thiếu state hoặc email không thỏa điều kiện miền trường {INTERNAL_EMAIL_DOMAIN}.
+                    </p>
+                </div>
+
                 <Card className="space-y-4">
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2">
-                            {authErrorCode ? <Badge tone="warning">Auth error {authErrorCode}</Badge> : null}
-                            {requestedRole ? <Badge tone="warning">Requested role {requestedRole}</Badge> : null}
-                            {!authErrorCode && !requestedRole ? <Badge tone="warning">Missing requested role</Badge> : null}
-                            {requestedReturnTo ? <Badge tone="neutral">Return target {requestedReturnTo}</Badge> : null}
-                        </div>
-                        <p className="text-sm text-error-700 dark:text-error-300">{errorMessage}</p>
+                    <div className="flex flex-wrap gap-2">
+                        {authErrorCode ? <Badge tone="warning">Mã lỗi {authErrorCode}</Badge> : null}
+                        {requestedRole ? <Badge tone="neutral">Role yêu cầu {requestedRole}</Badge> : null}
+                        {requestedReturnTo ? <Badge tone="neutral">Điểm đến {requestedReturnTo}</Badge> : null}
                     </div>
+
+                    <div className="rounded-2xl border border-error-200 bg-error-50 px-4 py-4 text-sm leading-6 text-error-700 dark:border-error-900 dark:bg-error-950/50 dark:text-error-300">
+                        {errorMessage}
+                    </div>
+
                     <div className="flex flex-wrap gap-3">
                         {retrySso ? (
                             <Button
@@ -98,7 +104,8 @@ export default function AuthCallbackPage() {
                                     window.location.assign(buildInternalSsoStartTarget(requestedReturnTo))
                                 }}
                             >
-                                Retry internal SSO
+                                <Chrome size={16} />
+                                Thử lại với Google
                             </Button>
                         ) : (
                             <Button
@@ -114,11 +121,13 @@ export default function AuthCallbackPage() {
                                     void sessionQuery.refetch()
                                 }}
                             >
-                                {hasExplicitBootstrap ? 'Retry bootstrap' : 'Retry session check'}
+                                <ArrowRight size={16} />
+                                {hasExplicitBootstrap ? 'Thử bootstrap lại' : 'Kiểm tra lại phiên'}
                             </Button>
                         )}
+
                         <Button type="button" variant="secondary" onClick={() => navigate('/auth/login', { replace: true })}>
-                            Back to login
+                            Quay lại đăng nhập
                         </Button>
                     </div>
                 </Card>
@@ -128,38 +137,41 @@ export default function AuthCallbackPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader
-                title="Session callback"
-                description="The auth shell is completing the requested session through `/api/auth/bootstrap` or backend-owned SSO, validating `/api/auth/me`, then redirecting to the safest allowed shell target."
-                icon={LogIn}
-            />
-            <Card className="space-y-4">
+            <div className="space-y-3">
+                <Badge tone="brand">Đang xác thực</Badge>
+                <h2 className="text-3xl font-bold tracking-tight text-gray-950 dark:text-white">Đang hoàn tất phiên Google Workspace UIT</h2>
+                <p className="text-sm leading-7 text-gray-500">
+                    Hệ thống đang kiểm tra email trường, role được gán trong backend và điều hướng anh vào đúng khu làm việc.
+                </p>
+            </div>
+
+            <Card className="space-y-5">
                 <div className="flex flex-wrap gap-2">
-                    {requestedRole ? <Badge tone="brand">Requested role {requestedRole}</Badge> : <Badge tone="brand">Current role {selectedRole}</Badge>}
-                    <Badge tone="neutral">Store role {selectedRole}</Badge>
-                    {redirectTarget ? <Badge tone="success">Next {redirectTarget}</Badge> : null}
+                    {requestedRole ? <Badge tone="brand">Role yêu cầu {requestedRole}</Badge> : <Badge tone="brand">Role hiện tại {selectedRole}</Badge>}
+                    {redirectTarget ? <Badge tone="success">Đi tới {redirectTarget}</Badge> : null}
                 </div>
-                {requestedRole && ['lecturer', 'operator', 'admin'].includes(requestedRole) ? (
-                    <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800 dark:border-brand-900 dark:bg-brand-950 dark:text-brand-200">
-                        <div className="flex items-center gap-2 font-semibold">
-                            <ShieldCheck size={16} />
-                            Internal account bootstrap
-                        </div>
-                        <p className="mt-2">
-                            Internal roles require an institutional email ending in `{INTERNAL_EMAIL_DOMAIN}` before the route guard will allow portal or admin access.
-                        </p>
+
+                <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-4 text-sm leading-6 text-brand-800 dark:border-brand-900 dark:bg-brand-950/50 dark:text-brand-200">
+                    <div className="flex items-center gap-2 font-semibold">
+                        <ShieldCheck size={16} />
+                        Quy tắc truy cập nội bộ
                     </div>
-                ) : null}
+                    <p className="mt-2">
+                        Teacher và admin chỉ hoạt động khi email thuộc miền {INTERNAL_EMAIL_DOMAIN}. Nếu tài khoản chưa được admin phân quyền, backend sẽ giữ
+                        nguyên role mặc định là student.
+                    </p>
+                </div>
+
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                     {hasExplicitBootstrap && requestedRole
                         ? isBootstrapping
-                            ? `Bootstrapping ${requestedRole} via /api/auth/bootstrap before redirect...`
+                            ? `Đang khởi tạo phiên ${requestedRole} trước khi chuyển trang...`
                             : activeSession
-                              ? `Resolved ${activeSession.user.role} session for ${activeSession.user.email}. Redirecting now...`
-                              : 'Waiting for auth bootstrap to complete...'
+                              ? `Đã xác nhận ${activeSession.user.email}. Hệ thống đang điều hướng...`
+                              : 'Đang chờ bootstrap hoàn tất...'
                         : activeSession
-                          ? `Validated ${activeSession.user.role} session for ${activeSession.user.email}. Redirecting now...`
-                          : 'Loading the current session from `/api/auth/me` after backend SSO handoff...'}
+                          ? `Đã xác nhận ${activeSession.user.email}. Hệ thống đang điều hướng...`
+                          : 'Đang kiểm tra cookie phiên sau khi hoàn tất Google OAuth...'}
                 </p>
             </Card>
         </div>

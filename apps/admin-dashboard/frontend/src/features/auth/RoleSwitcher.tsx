@@ -9,10 +9,8 @@ import { Button } from '@/shared/ui/primitives/Button'
 import { Select } from '@/shared/ui/primitives/Select'
 
 const roleOptions: Array<{ value: Role; label: string }> = [
-    { value: 'guest', label: 'Guest' },
     { value: 'student', label: 'Student' },
-    { value: 'lecturer', label: 'Lecturer' },
-    { value: 'operator', label: 'Operator' },
+    { value: 'teacher', label: 'Teacher' },
     { value: 'admin', label: 'Admin' },
 ]
 
@@ -52,7 +50,7 @@ export function RoleSwitcher() {
                 navigate(buildAuthCallbackTarget(nextRole, returnTo))
             }}
             options={roleOptions}
-            className="min-w-44"
+            className="min-w-40"
         />
     )
 }

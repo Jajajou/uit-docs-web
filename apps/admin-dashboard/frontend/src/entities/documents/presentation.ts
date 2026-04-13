@@ -67,7 +67,7 @@ export function getDocumentTrustState(document: Document) {
         return {
             tone: 'brand' as const,
             title: 'Trusted internal source',
-            description: 'The document is approved but remains restricted to internal staff and operators.',
+            description: 'The document is approved but remains restricted to internal staff and admins.',
         }
     }
 

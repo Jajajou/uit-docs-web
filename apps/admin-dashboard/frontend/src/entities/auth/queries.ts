@@ -49,7 +49,7 @@ export function useLogoutSessionMutation() {
         mutationFn: logoutSession,
         onSuccess: () => {
             useSessionStore.getState().clearBootstrap()
-            useSessionStore.getState().setRole('guest')
+            useSessionStore.getState().setRole('student')
             queryClient.removeQueries({ queryKey: ['auth', 'session'] })
         },
     })

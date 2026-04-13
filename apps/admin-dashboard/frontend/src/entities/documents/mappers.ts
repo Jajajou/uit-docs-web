@@ -11,6 +11,7 @@ import type {
     DocumentVersionEntry,
     DocumentVersionEntryDto,
 } from '@/entities/documents/types'
+import { normalizeRole } from '@/entities/auth/roles'
 
 export function mapTemporalMetadata(dto: DocumentDto['temporal_metadata']): DocumentTemporalMetadata {
     return {
@@ -98,7 +99,7 @@ export function mapDocumentActivityEntry(dto: DocumentActivityEntryDto): Documen
     return {
         id: dto.id,
         actorName: dto.actor_name,
-        actorRole: dto.actor_role,
+        actorRole: normalizeRole(dto.actor_role),
         action: dto.action,
         targetType: dto.target_type,
         targetId: dto.target_id,

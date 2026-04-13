@@ -1,3 +1,4 @@
+import { isRole, isRoleDto, normalizeRole } from '@/entities/auth/roles'
 import type { Role, SsoProviderMetadataDto } from '@/entities/auth/types'
 import type { AuditLogEntryDto, AdminUserDto, RolePolicyDto, SystemSettingDto } from '@/entities/admin/types'
 import type { ChatResponseDto, ConversationDto } from '@/entities/chat/types'
@@ -35,7 +36,7 @@ interface MockWorkspaceState {
 }
 
 const INTERNAL_EMAIL_DOMAIN = '@gm.uit.edu.vn'
-const INTERNAL_ROLES: Role[] = ['lecturer', 'operator', 'admin']
+const INTERNAL_ROLES: Role[] = ['teacher', 'admin']
 
 function clone<T>(value: T): T {
     return structuredClone(value)
@@ -91,13 +92,13 @@ function createError(error: MockHttpError, requestId: string): never {
 }
 
 function getRoleFromHeaders(headers: Record<string, string> | undefined): Role {
-    const role = headers?.['x-demo-role'] as Role | undefined
-    return role ?? 'guest'
+    const role = headers?.['x-demo-role']
+    return isRole(role) ? role : 'student'
 }
 
 function getRoleFromPayload(value: unknown): Role | null {
-    if (typeof value === 'string' && ['guest', 'student', 'lecturer', 'operator', 'admin'].includes(value)) {
-        return value as Role
+    if (isRole(value) || isRoleDto(value)) {
+        return normalizeRole(value)
     }
 
     return null
@@ -268,7 +269,7 @@ function resolveAuth(request: MockRequestDescriptor): MockHttpResponse {
     const session = clone(sessionFixtures[role])
 
     if (scenario === 'non-compliant-internal-email' && INTERNAL_ROLES.includes(role)) {
-        session.user.email = `${role}@uit.edu.vn`
+        session.user.email = `${role}@gmail.com`
     }
 
     return {
@@ -389,7 +390,7 @@ function resolveDocumentDetail(request: MockRequestDescriptor): MockHttpResponse
 }
 
 function resolveArchiveDocument(request: MockRequestDescriptor): MockHttpResponse {
-    const actorRole = ensureRoleAllowed(request, ['operator', 'admin'])
+    const actorRole = ensureRoleAllowed(request, ['admin'])
     const documentId = request.pathname.split('/')[2]
     const document = getHappyState().documents.find((entry) => entry.id === documentId)
 
@@ -412,7 +413,7 @@ function resolveArchiveDocument(request: MockRequestDescriptor): MockHttpRespons
 
     const auditEntry = buildDocumentActivityEntry(
         `audit-${request.requestId.slice(0, 6)}`,
-        actorRole === 'admin' ? 'Tran Van Admin' : 'Le Thi Operator',
+        'Tran Van Admin',
         actorRole,
         'archive_document',
         'document',
@@ -431,7 +432,7 @@ function resolveArchiveDocument(request: MockRequestDescriptor): MockHttpRespons
 }
 
 function resolveReindexDocument(request: MockRequestDescriptor): MockHttpResponse {
-    const actorRole = ensureRoleAllowed(request, ['operator', 'admin'])
+    const actorRole = ensureRoleAllowed(request, ['admin'])
     const documentId = request.pathname.split('/')[2]
     const document = getHappyState().documents.find((entry) => entry.id === documentId)
 
@@ -463,7 +464,7 @@ function resolveReindexDocument(request: MockRequestDescriptor): MockHttpRespons
 
     const auditEntry = buildDocumentActivityEntry(
         `audit-${request.requestId.slice(0, 6)}`,
-        actorRole === 'admin' ? 'Tran Van Admin' : 'Le Thi Operator',
+        'Tran Van Admin',
         actorRole,
         'reindex_document',
         'document',
@@ -576,7 +577,7 @@ function buildSubmissionFromRequest(request: MockRequestDescriptor, sourceType: 
         traceability: {
             review_task_id: `review-${request.requestId.slice(0, 6)}`,
             published_document_id: null,
-            reviewed_by_name: 'Le Thi Operator',
+            reviewed_by_name: 'Tran Van Admin',
             published_at: null,
             publication_reason: String(payload.notes || template.supplemental_metadata.notes),
         },
@@ -601,9 +602,9 @@ function buildSubmissionFromRequest(request: MockRequestDescriptor, sourceType: 
             title,
             source_type: sourceType,
             visibility_scope: submission.supplemental_metadata.visibility_scope,
-            submitted_by_name: 'Pham Van Lecturer',
-            submitted_by_email: 'lecturer@gm.uit.edu.vn',
-            reviewer_name: 'Le Thi Operator',
+            submitted_by_name: 'Pham Van Teacher',
+            submitted_by_email: 'teacher@gm.uit.edu.vn',
+            reviewer_name: 'Tran Van Admin',
             status: 'pending_review',
             confidence: submission.temporal_metadata.temporal_confidence,
             created_at: now,
@@ -613,7 +614,7 @@ function buildSubmissionFromRequest(request: MockRequestDescriptor, sourceType: 
         })
         getHappyState().auditLogs.unshift({
             id: `audit-${request.requestId.slice(0, 6)}`,
-            actor_name: 'Pham Van Lecturer',
+            actor_name: 'Pham Van Teacher',
             actor_role: getRoleFromHeaders(request.headers),
             action: 'upload_submission',
             target_type: 'submission',
@@ -774,7 +775,7 @@ function resolveReviewDecision(request: MockRequestDescriptor): MockHttpResponse
 
     const auditEntry = buildDocumentActivityEntry(
         `audit-${request.requestId.slice(0, 6)}`,
-        actorRole === 'admin' ? 'Tran Van Admin' : 'Le Thi Operator',
+        'Tran Van Admin',
         actorRole,
         auditAction,
         'review',
@@ -882,8 +883,8 @@ function resolvePatchAdminUser(request: MockRequestDescriptor): MockHttpResponse
     }
 
     const payload = typeof request.data === 'object' && request.data !== null ? request.data as Record<string, unknown> : {}
-    if (typeof payload.role === 'string') {
-        user.role = payload.role as Role
+    if (isRole(payload.role)) {
+        user.role = payload.role
     }
     if (typeof payload.status === 'string') {
         user.status = payload.status as AdminUserDto['status']
@@ -892,7 +893,7 @@ function resolvePatchAdminUser(request: MockRequestDescriptor): MockHttpResponse
         user.scope = payload.scope as AdminUserDto['scope']
     }
     user.last_active_at = currentIsoTime()
-    user.is_internal_domain_compliant = isInternalDomainCompliant(user.role, user.email)
+    user.is_internal_domain_compliant = isInternalDomainCompliant(normalizeRole(user.role), user.email)
 
     getHappyState().auditLogs.unshift({
         id: `audit-${request.requestId.slice(0, 6)}`,

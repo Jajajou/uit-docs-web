@@ -1,25 +1,28 @@
 import { Outlet } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
+import { useThemeStore } from '@/entities/preferences/theme'
+import { Button } from '@/shared/ui'
 
 export default function AuthLayout() {
+    const theme = useThemeStore((state) => state.theme)
+    const toggleTheme = useThemeStore((state) => state.toggleTheme)
+
     return (
-        <div className="min-h-screen bg-gray-50 px-4 py-10 dark:bg-gray-950">
-            <div className="mx-auto flex max-w-5xl items-center justify-center gap-10 lg:min-h-[calc(100vh-5rem)]">
-                <div className="hidden max-w-md space-y-4 lg:block">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-200">
-                        <ShieldCheck size={16} />
-                        Foundation auth shell
-                    </div>
-                    <h1 className="text-4xl font-bold tracking-tight text-gray-950 dark:text-white">
-                        Stable auth namespace before real UIT SSO
-                    </h1>
-                    <p className="text-base text-gray-500">
-                        This shell exists now so route contracts, role switching and callback handling stay stable when backend auth is introduced.
-                    </p>
+        <div className="surface-grid relative min-h-screen overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(47,86,245,0.1),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.56),rgba(248,251,255,0.84))] dark:bg-[radial-gradient(circle_at_top_left,rgba(74,163,255,0.14),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(47,86,245,0.14),transparent_28%),linear-gradient(180deg,rgba(4,10,20,0.28),rgba(4,10,20,0.54))]" />
+
+            <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-6">
+                <div className="flex justify-end">
+                    <Button variant="secondary" size="sm" onClick={toggleTheme} aria-label="Đổi giao diện sáng tối">
+                        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                        {theme === 'dark' ? 'Sáng' : 'Tối'}
+                    </Button>
                 </div>
 
-                <div className="w-full max-w-xl rounded-3xl border border-gray-200 bg-white p-6 shadow-theme-xl dark:border-gray-800 dark:bg-gray-900 sm:p-8">
-                    <Outlet />
+                <div className="flex flex-1 items-center justify-center py-6 sm:py-10">
+                    <div className="w-full max-w-[28rem]">
+                        <Outlet />
+                    </div>
                 </div>
             </div>
         </div>

@@ -16,8 +16,7 @@ type TargetTypeFilter = 'all' | AuditTargetType
 const roleOptions = [
     { label: 'All actors', value: 'all' },
     { label: 'Student', value: 'student' },
-    { label: 'Lecturer', value: 'lecturer' },
-    { label: 'Operator', value: 'operator' },
+    { label: 'Teacher', value: 'teacher' },
     { label: 'Admin', value: 'admin' },
 ]
 

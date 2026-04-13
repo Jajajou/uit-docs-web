@@ -1,6 +1,6 @@
 """API routers package."""
 
-from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, upload
+from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, test_support, upload
 
 __all__ = [
     "admin",
@@ -11,5 +11,6 @@ __all__ = [
     "jobs",
     "reviews",
     "submissions",
+    "test_support",
     "upload",
 ]

@@ -1,8 +1,8 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BookOpen } from 'lucide-react'
-import { formatStatusLabel, getLifecycleTone, getVisibilityTone } from '@/entities/documents/presentation'
 import { useDocumentsQuery } from '@/entities/documents/queries'
+import type { DocumentLifecycleStatus, VisibilityScope } from '@/entities/documents/types'
 import { formatDateTime } from '@/shared/lib/format'
 import { Badge, Card, FilterBar, Select } from '@/shared/ui'
 import { DataTable } from '@/shared/ui/composites/DataTable'
@@ -10,18 +10,59 @@ import { DataTable } from '@/shared/ui/composites/DataTable'
 type LifecycleFilter = 'all' | 'approved' | 'pending_review' | 'archived'
 type VisibilityFilter = 'all' | 'public' | 'internal'
 
+const lifecycleLabelMap: Record<DocumentLifecycleStatus, string> = {
+    approved: 'Đã duyệt',
+    pending_review: 'Chờ rà soát',
+    rejected: 'Không duyệt',
+    archived: 'Đã lưu trữ',
+    draft: 'Bản nháp',
+}
+
+const visibilityLabelMap: Record<VisibilityScope, string> = {
+    public: 'Công khai',
+    internal: 'Nội bộ',
+}
+
 const lifecycleOptions = [
-    { label: 'All lifecycle states', value: 'all' },
-    { label: 'Approved', value: 'approved' },
-    { label: 'Pending review', value: 'pending_review' },
-    { label: 'Archived', value: 'archived' },
+    { label: 'Tất cả trạng thái', value: 'all' },
+    { label: 'Đã duyệt', value: 'approved' },
+    { label: 'Chờ rà soát', value: 'pending_review' },
+    { label: 'Đã lưu trữ', value: 'archived' },
 ]
 
 const visibilityOptions = [
-    { label: 'All visibility scopes', value: 'all' },
-    { label: 'Public', value: 'public' },
-    { label: 'Internal', value: 'internal' },
+    { label: 'Tất cả phạm vi', value: 'all' },
+    { label: 'Công khai', value: 'public' },
+    { label: 'Nội bộ', value: 'internal' },
 ]
+
+function formatLifecycleLabel(status: DocumentLifecycleStatus) {
+    return lifecycleLabelMap[status] ?? status
+}
+
+function formatVisibilityLabel(scope: VisibilityScope) {
+    return visibilityLabelMap[scope] ?? scope
+}
+
+function getLifecycleTone(status: DocumentLifecycleStatus) {
+    if (status === 'approved') {
+        return 'success' as const
+    }
+
+    if (status === 'pending_review') {
+        return 'warning' as const
+    }
+
+    if (status === 'archived') {
+        return 'neutral' as const
+    }
+
+    return 'danger' as const
+}
+
+function getVisibilityTone(scope: VisibilityScope) {
+    return scope === 'public' ? ('brand' as const) : ('neutral' as const)
+}
 
 export function DocumentLibrary({ scenario }: { scenario?: string }) {
     const documentsQuery = useDocumentsQuery({ scenario })
@@ -37,7 +78,7 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
             const matchesSearch =
                 normalizedSearch.length === 0 ||
                 document.title.toLowerCase().includes(normalizedSearch) ||
-                document.ownerName.toLowerCase().includes(normalizedSearch) ||
+                document.supplemental.issuingUnit.toLowerCase().includes(normalizedSearch) ||
                 document.temporal.documentType.toLowerCase().includes(normalizedSearch)
 
             const matchesLifecycle = lifecycleFilter === 'all' || document.lifecycleStatus === lifecycleFilter
@@ -51,24 +92,28 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
     const documentCounts = documentsQuery.data ?? []
 
     if (documentsQuery.isError) {
-        return <div className="rounded-2xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-800 dark:bg-error-950 dark:text-error-300">{documentsQuery.error.message}</div>
+        return (
+            <div className="rounded-2xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-800 dark:bg-error-950 dark:text-error-300">
+                {documentsQuery.error.message}
+            </div>
+        )
     }
 
     return (
         <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
                 <Card className="space-y-1">
-                    <div className="text-sm font-medium text-gray-500">Total documents</div>
+                    <div className="text-sm font-medium text-gray-500">Tổng tài liệu</div>
                     <div className="text-2xl font-semibold text-gray-950 dark:text-white">{documentCounts.length}</div>
                 </Card>
                 <Card className="space-y-1">
-                    <div className="text-sm font-medium text-gray-500">Public ready</div>
+                    <div className="text-sm font-medium text-gray-500">Sẵn sàng trích dẫn</div>
                     <div className="text-2xl font-semibold text-gray-950 dark:text-white">
                         {documentCounts.filter((document) => document.supplemental.visibilityScope === 'public').length}
                     </div>
                 </Card>
                 <Card className="space-y-1">
-                    <div className="text-sm font-medium text-gray-500">Archived</div>
+                    <div className="text-sm font-medium text-gray-500">Đã lưu trữ</div>
                     <div className="text-2xl font-semibold text-gray-950 dark:text-white">
                         {documentCounts.filter((document) => document.system.isArchived).length}
                     </div>
@@ -78,12 +123,12 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
             <FilterBar
                 searchValue={searchValue}
                 onSearchChange={setSearchValue}
-                searchPlaceholder="Search by title, owner or document type..."
+                searchPlaceholder="Tìm theo tên, đơn vị ban hành hoặc loại tài liệu..."
                 actions={
                     <>
                         <div className="min-w-56">
                             <Select
-                                aria-label="Filter by lifecycle"
+                                aria-label="Lọc theo trạng thái"
                                 options={lifecycleOptions}
                                 value={lifecycleFilter}
                                 onChange={(event) => setLifecycleFilter(event.target.value as LifecycleFilter)}
@@ -91,7 +136,7 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
                         </div>
                         <div className="min-w-56">
                             <Select
-                                aria-label="Filter by visibility"
+                                aria-label="Lọc theo phạm vi"
                                 options={visibilityOptions}
                                 value={visibilityFilter}
                                 onChange={(event) => setVisibilityFilter(event.target.value as VisibilityFilter)}
@@ -106,12 +151,12 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
                 getRowKey={(document) => document.id}
                 isLoading={documentsQuery.isLoading}
                 emptyIcon={BookOpen}
-                emptyTitle="No documents found"
-                emptyDescription="Try a broader search or reset the lifecycle and visibility filters."
+                emptyTitle="Chưa có tài liệu phù hợp"
+                emptyDescription="Hãy thử nới điều kiện lọc hoặc tìm kiếm theo từ khóa khác."
                 columns={[
                     {
                         key: 'title',
-                        header: 'Document',
+                        header: 'Tài liệu',
                         render: (document) => (
                             <div className="space-y-1">
                                 <Link to={`/documents/${document.id}`} className="font-medium text-gray-900 hover:text-brand-700 dark:text-white">
@@ -122,34 +167,31 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
                         ),
                     },
                     {
-                        key: 'owner',
-                        header: 'Owner',
-                        render: (document) => document.ownerName,
-                    },
-                    {
                         key: 'lifecycle',
-                        header: 'Lifecycle',
+                        header: 'Trạng thái',
                         render: (document) => (
-                            <Badge tone={getLifecycleTone(document.lifecycleStatus)}>{formatStatusLabel(document.lifecycleStatus)}</Badge>
-                        ),
-                    },
-                    {
-                        key: 'visibility',
-                        header: 'Visibility',
-                        render: (document) => (
-                            <Badge tone={getVisibilityTone(document.supplemental.visibilityScope)}>
-                                {document.supplemental.visibilityScope}
+                            <Badge tone={getLifecycleTone(document.lifecycleStatus)}>
+                                {formatLifecycleLabel(document.lifecycleStatus)}
                             </Badge>
                         ),
                     },
                     {
-                        key: 'type',
-                        header: 'Type',
-                        render: (document) => document.temporal.documentType,
+                        key: 'visibility',
+                        header: 'Phạm vi',
+                        render: (document) => (
+                            <Badge tone={getVisibilityTone(document.supplemental.visibilityScope)}>
+                                {formatVisibilityLabel(document.supplemental.visibilityScope)}
+                            </Badge>
+                        ),
+                    },
+                    {
+                        key: 'academicYear',
+                        header: 'Năm học',
+                        render: (document) => document.temporal.academicYear ?? 'Chưa cập nhật',
                     },
                     {
                         key: 'updated',
-                        header: 'Updated',
+                        header: 'Cập nhật',
                         render: (document) => formatDateTime(document.updatedAt),
                     },
                 ]}

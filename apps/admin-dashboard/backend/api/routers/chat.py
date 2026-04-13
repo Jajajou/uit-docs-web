@@ -16,7 +16,7 @@ async def list_sessions(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    return {"conversations": service.list_conversations(context.scenario)}
+    return {"conversations": service.list_conversations(context.scenario, context.role)}
 
 
 @router.post("/stream", response_model=ChatResponseDto)
@@ -25,4 +25,4 @@ async def stream_chat(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    return service.send_chat_message(payload.model_dump(), context.scenario)
+    return service.send_chat_message(payload.model_dump(), context.scenario, context.role)

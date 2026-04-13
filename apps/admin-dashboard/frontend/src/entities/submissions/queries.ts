@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createUploadSubmission, getSubmissionById, getSubmissions } from '@/entities/submissions/api'
-import type { UploadMutationPayload } from '@/entities/submissions/types'
+import { createMultipartUploadSubmission, createUploadSubmission, getSubmissionById, getSubmissions } from '@/entities/submissions/api'
+import type { FileUploadMutationPayload, UploadMutationPayload } from '@/entities/submissions/types'
+import { isMockAdapterEnabled } from '@/shared/api/mockRuntime'
 
 export function useSubmissionsQuery(params?: { scenario?: string }) {
     return useQuery({
@@ -33,7 +34,21 @@ function useUploadMutation(
 }
 
 export function useFileUploadMutation(params?: { scenario?: string }) {
-    return useUploadMutation('/uploads/file', params)
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: ({ file, ...payload }: FileUploadMutationPayload) => {
+            if (file && !isMockAdapterEnabled) {
+                return createMultipartUploadSubmission(file, payload, params)
+            }
+
+            return createUploadSubmission('/uploads/file', payload, params)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions'] })
+            queryClient.invalidateQueries({ queryKey: ['jobs'] })
+        },
+    })
 }
 
 export function useTextUploadMutation(params?: { scenario?: string }) {

@@ -1,4 +1,5 @@
-export type Role = 'guest' | 'student' | 'lecturer' | 'operator' | 'admin'
+export type Role = 'student' | 'teacher' | 'admin'
+export type RoleDto = 'guest' | 'student' | 'teacher' | 'lecturer' | 'operator' | 'admin'
 
 export interface User {
     id: string
@@ -19,7 +20,7 @@ export interface UserDto {
     id: string
     name: string
     email: string
-    role: Role
+    role: RoleDto
     department: string
     avatar_initials: string
 }

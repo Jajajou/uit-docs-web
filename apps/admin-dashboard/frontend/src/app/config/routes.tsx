@@ -1,24 +1,16 @@
 import {
     Bot,
-    ClipboardList,
-    FileSearch,
-    Files,
-    Home,
-    LayoutDashboard,
-    Library,
-    LogIn,
-    ScrollText,
-    Settings,
-    ShieldCheck,
     Upload,
-    Users,
-    Workflow,
+    ShieldCheck,
+    LogIn,
+    FileSearch
 } from 'lucide-react'
 import { matchPath } from 'react-router-dom'
+import { appRoles, isInternalRole } from '@/entities/auth/roles'
 import type { Role, Session } from '@/entities/auth/types'
 import type { SidebarNavItem } from '@/shared/ui/composites/Sidebar'
 
-export type AppShellKind = 'public' | 'auth' | 'portal' | 'admin' | 'system'
+export type AppShellKind = 'app' | 'auth' | 'system'
 
 export interface AppRouteMeta {
     path: string
@@ -29,55 +21,23 @@ export interface AppRouteMeta {
     icon?: SidebarNavItem['icon']
 }
 
-export const allRoles: Role[] = ['guest', 'student', 'lecturer', 'operator', 'admin']
-export const internalRoles: Role[] = ['lecturer', 'operator', 'admin']
-export const portalContributorRoles: Role[] = ['lecturer', 'operator', 'admin']
-export const portalOperatorRoles: Role[] = ['operator', 'admin']
+export const allRoles: Role[] = [...appRoles]
+export const internalRoles: Role[] = ['teacher', 'admin']
+export const portalContributorRoles: Role[] = ['teacher', 'admin']
+export const adminControlRoles: Role[] = ['admin']
 export const INTERNAL_EMAIL_DOMAIN = '@gm.uit.edu.vn'
 
 export const routeMeta: AppRouteMeta[] = [
-    { path: '/', title: 'Trang chu', shell: 'public', allowedRoles: allRoles, navLabel: 'Home', icon: Home },
-    { path: '/chat', title: 'Chat', shell: 'public', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
-    { path: '/documents/:id', title: 'Document detail', shell: 'public', allowedRoles: allRoles, navLabel: 'Documents', icon: FileSearch },
-    { path: '/auth/login', title: 'Login', shell: 'auth', allowedRoles: allRoles, navLabel: 'Login', icon: LogIn },
-    { path: '/auth/callback', title: 'Auth callback', shell: 'auth', allowedRoles: allRoles },
-    { path: '/403', title: 'Access denied', shell: 'system', allowedRoles: allRoles },
-    { path: '/portal', title: 'Portal overview', shell: 'portal', allowedRoles: portalContributorRoles, navLabel: 'Overview', icon: LayoutDashboard },
-    { path: '/portal/upload', title: 'Upload', shell: 'portal', allowedRoles: portalContributorRoles, navLabel: 'Upload', icon: Upload },
-    { path: '/portal/submissions', title: 'Submissions', shell: 'portal', allowedRoles: portalContributorRoles, navLabel: 'Submissions', icon: Files },
-    { path: '/portal/submissions/:id', title: 'Submission detail', shell: 'portal', allowedRoles: portalContributorRoles },
-    { path: '/portal/review', title: 'Review queue', shell: 'portal', allowedRoles: portalOperatorRoles, navLabel: 'Review', icon: ClipboardList },
-    { path: '/portal/library', title: 'Library', shell: 'portal', allowedRoles: portalOperatorRoles, navLabel: 'Library', icon: Library },
-    { path: '/portal/jobs', title: 'Jobs', shell: 'portal', allowedRoles: portalOperatorRoles, navLabel: 'Jobs', icon: Workflow },
-    { path: '/admin/users', title: 'Users', shell: 'admin', allowedRoles: ['admin'], navLabel: 'Users', icon: Users },
-    { path: '/admin/roles', title: 'Roles', shell: 'admin', allowedRoles: ['admin'], navLabel: 'Roles', icon: ShieldCheck },
-    { path: '/admin/settings', title: 'Settings', shell: 'admin', allowedRoles: ['admin'], navLabel: 'Settings', icon: Settings },
-    { path: '/admin/audit-logs', title: 'Audit logs', shell: 'admin', allowedRoles: ['admin'], navLabel: 'Audit logs', icon: ScrollText },
+    { path: '/', title: 'Chat', shell: 'app', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
+    { path: '/chat', title: 'Chat', shell: 'app', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
+    { path: '/knowledge', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles },
+    { path: '/documents/:id', title: 'Chi tiết tài liệu', shell: 'app', allowedRoles: allRoles, navLabel: 'Tài liệu', icon: FileSearch },
+    { path: '/upload', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles, navLabel: 'Tải lên', icon: Upload },
+    { path: '/manager', title: 'Quản trị', shell: 'app', allowedRoles: adminControlRoles, navLabel: 'Quản trị', icon: ShieldCheck },
+    { path: '/auth/login', title: 'Đăng nhập', shell: 'auth', allowedRoles: allRoles, navLabel: 'Đăng nhập', icon: LogIn },
+    { path: '/auth/callback', title: 'Xác thực', shell: 'auth', allowedRoles: allRoles },
+    { path: '/403', title: 'Không có quyền truy cập', shell: 'system', allowedRoles: allRoles },
 ]
-
-export const publicNavItems: SidebarNavItem[] = routeMeta
-    .filter((route) => route.shell === 'public' && route.navLabel && route.icon)
-    .map((route) => ({
-        label: route.navLabel!,
-        path: route.path.replace('/:id', '/doc-001'),
-        icon: route.icon!,
-    }))
-
-export const portalNavItems: SidebarNavItem[] = routeMeta
-    .filter((route) => route.shell === 'portal' && route.navLabel && route.icon)
-    .map((route) => ({
-        label: route.navLabel!,
-        path: route.path,
-        icon: route.icon!,
-    }))
-
-export const adminNavItems: SidebarNavItem[] = routeMeta
-    .filter((route) => route.shell === 'admin' && route.navLabel && route.icon)
-    .map((route) => ({
-        label: route.navLabel!,
-        path: route.path,
-        icon: route.icon!,
-    }))
 
 export function getRouteMeta(pathname: string) {
     return routeMeta.find((route) => matchPath({ path: route.path, end: true }, pathname))
@@ -93,8 +53,22 @@ export function canAccessPath(role: Role, pathname: string) {
     return meta.allowedRoles.includes(role)
 }
 
-export function isInternalRole(role: Role) {
-    return internalRoles.includes(role)
+export function getExperienceRole(role: Role) {
+    return role
+}
+
+export function getExperienceRoleLabel(role: Role) {
+    const experienceRole = getExperienceRole(role)
+
+    if (experienceRole === 'teacher') {
+        return 'Giảng viên'
+    }
+
+    if (experienceRole === 'admin') {
+        return 'Quản trị viên'
+    }
+
+    return 'Sinh viên'
 }
 
 export function hasRequiredInternalEmail(role: Role, email: string) {
@@ -105,14 +79,6 @@ export function canAccessSessionPath(session: Session, pathname: string) {
     return canAccessPath(session.user.role, pathname) && hasRequiredInternalEmail(session.user.role, session.user.email)
 }
 
-export function getDefaultPathForRole(role: Role) {
-    if (role === 'admin') {
-        return '/admin/users'
-    }
-
-    if (role === 'guest' || role === 'student') {
-        return '/'
-    }
-
-    return '/portal'
+export function getDefaultPathForRole(_role: Role) {
+    return '/chat'
 }

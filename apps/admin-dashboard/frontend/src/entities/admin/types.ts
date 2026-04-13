@@ -1,8 +1,9 @@
-import type { Role } from '@/entities/auth/types'
+import type { Role, RoleDto } from '@/entities/auth/types'
 
-export type AdminShellScope = 'public' | 'auth' | 'portal' | 'admin' | 'system'
+export type AdminShellScope = 'app' | 'auth' | 'system'
 export type AdminUserStatus = 'active' | 'invited' | 'suspended'
-export type AdminUserScope = 'student_portal' | 'contributor_portal' | 'operator_portal' | 'admin_console'
+export type AdminUserScope = 'student_portal' | 'teacher_workspace' | 'admin_console'
+export type AdminUserScopeDto = AdminUserScope | 'contributor_portal' | 'operator_portal'
 export type SystemSettingGroup = 'auth' | 'ingestion' | 'publication' | 'chat'
 export type SystemSettingSource = 'derived_contract' | 'mock_policy'
 export type AuditActionType =
@@ -59,15 +60,15 @@ export interface AdminUserDto {
     id: string
     name: string
     email: string
-    role: Role
+    role: RoleDto
     status: AdminUserStatus
-    scope: AdminUserScope
+    scope: AdminUserScopeDto
     last_active_at: string
     is_internal_domain_compliant: boolean
 }
 
 export interface RolePolicyDto {
-    role: Role
+    role: RoleDto
     allowed_shells: AdminShellScope[]
     allowed_routes: string[]
     requires_internal_email: boolean
@@ -86,7 +87,7 @@ export interface SystemSettingDto {
 export interface AuditLogEntryDto {
     id: string
     actor_name: string
-    actor_role: Role
+    actor_role: RoleDto
     action: AuditActionType
     target_type: AuditTargetType
     target_id: string

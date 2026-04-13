@@ -1,11 +1,12 @@
 import type { Session, SessionDto, SsoProviderMetadata, SsoProviderMetadataDto, User } from '@/entities/auth/types'
+import { normalizeRole } from '@/entities/auth/roles'
 
 export function mapUserDtoToUser(dto: SessionDto['user']): User {
     return {
         id: dto.id,
         name: dto.name,
         email: dto.email,
-        role: dto.role,
+        role: normalizeRole(dto.role),
         department: dto.department,
         avatarInitials: dto.avatar_initials,
     }
