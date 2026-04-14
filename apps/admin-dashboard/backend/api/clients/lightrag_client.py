@@ -119,6 +119,47 @@ class LightRAGClient:
         )
         return response.json() if response.ok else {"error": response.text, "documents": []}
 
+    @staticmethod
+    def extract_documents(result: dict | None) -> list[dict]:
+        """Flatten LightRAG document payloads across legacy and status-grouped shapes."""
+        if not isinstance(result, dict):
+            return []
+        documents = result.get("documents")
+        if isinstance(documents, list):
+            return [document for document in documents if isinstance(document, dict)]
+        statuses = result.get("statuses")
+        if isinstance(statuses, dict):
+            flattened: list[dict] = []
+            for entries in statuses.values():
+                if isinstance(entries, list):
+                    flattened.extend(document for document in entries if isinstance(document, dict))
+            return flattened
+        return []
+
+    def find_documents_by_file_path(
+        self,
+        file_path: str,
+        *,
+        page_size: int = 200,
+        max_pages: int = 10,
+    ) -> list[dict]:
+        """Resolve LightRAG documents by file source/path, including status metadata."""
+        matches: list[dict] = []
+        page = 1
+        while page <= max_pages:
+            result = self.get_documents(page=page, page_size=page_size)
+            documents = self.extract_documents(result)
+            if not documents:
+                break
+            for document in documents:
+                if str(document.get("file_path") or "") == file_path:
+                    matches.append(document)
+            pagination = result.get("pagination") if isinstance(result, dict) else {}
+            if not isinstance(pagination, dict) or not pagination.get("has_next"):
+                break
+            page += 1
+        return matches
+
     def find_document_ids_by_file_path(
         self,
         file_path: str,
@@ -127,23 +168,15 @@ class LightRAGClient:
         max_pages: int = 10,
     ) -> list[str]:
         """Resolve LightRAG document ids by file source/path."""
-        matches: list[str] = []
-        page = 1
-        while page <= max_pages:
-            result = self.get_documents(page=page, page_size=page_size)
-            documents = result.get("documents") if isinstance(result, dict) else []
-            if not isinstance(documents, list):
-                break
-            for document in documents:
-                if str(document.get("file_path") or "") == file_path:
-                    document_id = str(document.get("id") or "").strip()
-                    if document_id:
-                        matches.append(document_id)
-            pagination = result.get("pagination") if isinstance(result, dict) else {}
-            if not isinstance(pagination, dict) or not pagination.get("has_next"):
-                break
-            page += 1
-        return matches
+        return [
+            document_id
+            for document in self.find_documents_by_file_path(
+                file_path,
+                page_size=page_size,
+                max_pages=max_pages,
+            )
+            if (document_id := str(document.get("id") or "").strip())
+        ]
 
     def delete_document(self, doc_ids: list[str]) -> dict:
         """Delete documents by ids."""

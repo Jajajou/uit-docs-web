@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 import re
+from time import sleep
 import unicodedata
 from urllib.parse import urlparse
 from typing import Any, cast
@@ -27,8 +28,9 @@ from api.services.workspace_store import WorkspaceStateStore
 INTERNAL_ROLES = {"teacher", "admin"}
 DOCUMENT_ADMIN_ROLES = {"admin"}
 PUBLIC_DOCUMENT_ROLES = {"guest", "student", "teacher"}
-REDACTED_LABEL = "Da an trong giao dien cong khai"
+REDACTED_LABEL = "Đã ẩn trong giao diện công khai"
 REDACTED_EMAIL = REDACTED_LABEL
+INTERNAL_WORKSPACE_SOURCE_PREFIX = "admin-dashboard-live://"
 PUBLIC_WORKSPACE_SOURCE_PREFIX = "admin-dashboard-public://"
 
 
@@ -45,6 +47,11 @@ def make_avatar_initials(name: str, email: str) -> str:
     return email[:2].upper()
 
 
+def normalize_search_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFD", value.casefold().replace("đ", "d"))
+    return "".join(character for character in normalized if unicodedata.category(character) != "Mn")
+
+
 class InMemoryWorkspaceService:
     """Provides contract-aligned data via per-entity store CRUD."""
 
@@ -52,10 +59,12 @@ class InMemoryWorkspaceService:
         if store is None:
             raise ValueError("A workspace store must be provided.")
         self.store = store
+        self._internal_workspace_seeded = False
         self._public_workspace_seeded = False
 
     def reset(self) -> None:
         self.store.reset()
+        self._internal_workspace_seeded = False
         self._public_workspace_seeded = False
 
     def _raise(self, status_code: int, code: str, message: str, details: Any = None) -> None:
@@ -73,6 +82,110 @@ class InMemoryWorkspaceService:
 
     def _make_compliance(self, role: str, email: str) -> bool:
         return role not in INTERNAL_ROLES or email.lower().endswith(INTERNAL_EMAIL_DOMAIN)
+
+    def _conversation_owner_key(
+        self,
+        role: Role,
+        session: dict | None,
+        session_token: str | None = None,
+    ) -> str | None:
+        if isinstance(session, dict):
+            email = str(session.get("user", {}).get("email") or "").strip().lower()
+            if email:
+                return f"user:{email}"
+            session_id = str(session.get("session_id") or "").strip().lower()
+            if session_id:
+                return f"session:{session_id}"
+        if session_token:
+            return f"token:{session_token.strip().lower()}"
+        if role == "guest":
+            return None
+        return f"role:{role}"
+
+    def _conversation_owner_aliases(
+        self,
+        role: Role,
+        session: dict | None,
+        session_token: str | None = None,
+    ) -> set[str]:
+        aliases: set[str] = set()
+        preferred_owner = self._conversation_owner_key(role, session, session_token)
+        if preferred_owner:
+            aliases.add(preferred_owner)
+        if role != "guest":
+            aliases.add(f"role:{role}")
+        if isinstance(session, dict):
+            email = str(session.get("user", {}).get("email") or "").strip().lower()
+            if email:
+                aliases.add(f"user:{email}")
+            session_id = str(session.get("session_id") or "").strip().lower()
+            if session_id:
+                aliases.add(f"session:{session_id}")
+        if session_token:
+            aliases.add(f"token:{session_token.strip().lower()}")
+        return aliases
+
+    def _conversation_visible_to_owner(
+        self,
+        conversation: dict,
+        owner_key: str | None,
+        owner_aliases: set[str] | None = None,
+    ) -> bool:
+        aliases = owner_aliases or ({owner_key} if owner_key else set())
+        if not aliases:
+            return False
+        stored_owner = str(conversation.get("owner_key") or "").strip().lower()
+        if not stored_owner:
+            return True
+        return stored_owner in aliases
+
+    def _ensure_conversation_owner(
+        self,
+        conversation: dict,
+        owner_key: str | None,
+        owner_aliases: set[str] | None = None,
+    ) -> dict:
+        if owner_key is None:
+            return conversation
+        stored_owner = str(conversation.get("owner_key") or "").strip().lower()
+        if stored_owner and stored_owner == owner_key:
+            return conversation
+        if stored_owner and owner_aliases and stored_owner not in owner_aliases:
+            return conversation
+        updated_conversation = deepcopy(conversation)
+        updated_conversation["owner_key"] = owner_key
+        self.store.upsert_conversation(updated_conversation)
+        return updated_conversation
+
+    def _list_owned_conversations(self, owner_key: str | None, owner_aliases: set[str] | None = None) -> list[dict]:
+        aliases = owner_aliases or ({owner_key} if owner_key else set())
+        if not aliases:
+            return []
+        owned: list[dict] = []
+        for conversation in self.store.list_all_conversations():
+            if not self._conversation_visible_to_owner(conversation, owner_key, aliases):
+                continue
+            owned.append(self._ensure_conversation_owner(conversation, owner_key, aliases))
+        return owned
+
+    def _find_owned_conversation(
+        self,
+        conversation_id: str,
+        owner_key: str | None,
+        owner_aliases: set[str] | None = None,
+    ) -> dict | None:
+        aliases = owner_aliases or ({owner_key} if owner_key else set())
+        conversation = self.store.get_conversation_by_id(conversation_id)
+        if conversation is None:
+            return None
+        if not self._conversation_visible_to_owner(conversation, owner_key, aliases):
+            return None
+        return self._ensure_conversation_owner(conversation, owner_key, aliases)
+
+    def _conversation_response_payload(self, conversation: dict) -> dict:
+        payload = deepcopy(conversation)
+        payload.pop("owner_key", None)
+        return payload
 
     def _default_scope_for_role(self, role: Role) -> str:
         if role == "student":
@@ -244,8 +357,8 @@ class InMemoryWorkspaceService:
             document["supplemental_metadata"]["visibility_scope"] != "public"
             or document["lifecycle_status"] not in {"approved", "archived"}
         ):
-            redacted["title"] = "Tai lieu dang cho kiem duyet noi bo"
-            redacted["excerpt"] = "Chi tiet nguon da duoc an trong giao dien cong khai."
+            redacted["title"] = "Tài liệu đang chờ kiểm duyệt nội bộ"
+            redacted["excerpt"] = "Chi tiết nguồn đã được ẩn trong giao diện công khai."
 
         return redacted
 
@@ -389,13 +502,13 @@ class InMemoryWorkspaceService:
             documents = [document for document in documents if document["system_metadata"]["is_archived"]]
 
         if search:
-            needle = search.lower()
+            needle = normalize_search_text(search)
             documents = [
                 document
                 for document in documents
-                if needle in document["title"].lower()
-                or needle in document["supplemental_metadata"]["issuing_unit"].lower()
-                or any(needle in tag.lower() for tag in document["supplemental_metadata"]["tags"])
+                if needle in normalize_search_text(document["title"])
+                or needle in normalize_search_text(document["supplemental_metadata"]["issuing_unit"])
+                or any(needle in normalize_search_text(tag) for tag in document["supplemental_metadata"]["tags"])
             ]
         if lifecycle_status:
             documents = [document for document in documents if document["lifecycle_status"] == lifecycle_status]
@@ -879,8 +992,12 @@ class InMemoryWorkspaceService:
         if compliance == "non_compliant":
             users = [user for user in users if not user["is_internal_domain_compliant"]]
         if search:
-            needle = search.lower()
-            users = [user for user in users if needle in user["name"].lower() or needle in user["email"].lower()]
+            needle = normalize_search_text(search)
+            users = [
+                user
+                for user in users
+                if needle in normalize_search_text(user["name"]) or needle in normalize_search_text(user["email"])
+            ]
         return users
 
     def update_admin_user(self, user_id: str, payload: dict) -> dict:
@@ -942,48 +1059,84 @@ class InMemoryWorkspaceService:
         if target_type:
             logs = [log for log in logs if log["target_type"] == target_type]
         if search:
-            needle = search.lower()
+            needle = normalize_search_text(search)
             logs = [
                 log
                 for log in logs
-                if needle in log["actor_name"].lower()
-                or needle in log["target_label"].lower()
-                or needle in log["action"]
+                if needle in normalize_search_text(log["actor_name"])
+                or needle in normalize_search_text(log["target_label"])
+                or needle in normalize_search_text(log["action"])
             ]
         return logs
 
     # ── Conversations / Chat ──
 
-    def list_conversations(self, scenario: str, role: Role = "guest") -> list[dict]:
+    def list_conversations(
+        self,
+        scenario: str,
+        role: Role = "guest",
+        session: dict | None = None,
+        session_token: str | None = None,
+    ) -> list[dict]:
         if scenario == "empty":
             return []
-        conversations = self.store.list_all_conversations()
+        owner_key = self._conversation_owner_key(role, session, session_token)
+        owner_aliases = self._conversation_owner_aliases(role, session, session_token)
+        conversations = [
+            self._conversation_response_payload(conversation)
+            for conversation in self._list_owned_conversations(owner_key, owner_aliases)
+        ]
         if self._is_document_admin(role):
             return conversations
         return [self._redact_conversation_for_public_surface(conversation) for conversation in conversations]
+
+    def delete_conversation(
+        self,
+        conversation_id: str,
+        role: Role = "guest",
+        session: dict | None = None,
+        session_token: str | None = None,
+    ) -> None:
+        owner_key = self._conversation_owner_key(role, session, session_token)
+        owner_aliases = self._conversation_owner_aliases(role, session, session_token)
+        conversation = self._find_owned_conversation(conversation_id, owner_key, owner_aliases)
+        if conversation is None:
+            self._raise(404, "conversation_not_found", "Không tìm thấy cuộc trò chuyện.")
+        self.store.delete_conversation(conversation_id)
+
+    def clear_conversations(
+        self,
+        role: Role = "guest",
+        session: dict | None = None,
+        session_token: str | None = None,
+    ) -> None:
+        owner_key = self._conversation_owner_key(role, session, session_token)
+        owner_aliases = self._conversation_owner_aliases(role, session, session_token)
+        for conversation in self._list_owned_conversations(owner_key, owner_aliases):
+            self.store.delete_conversation(conversation["id"])
 
     def _build_mock_chat_reply(self, question: str, scenario: str) -> dict:
         return {
             "id": f"msg-{uuid4().hex[:8]}",
             "role": "assistant",
             "content": (
-                f'Toi tim thay thong tin lien quan den: "{question}", nhung do tin cay dang thap va ban nen doi chieu them voi phong ban phu trach.'
+                f'Tôi tìm thấy thông tin liên quan đến: "{question}", nhưng độ tin cậy đang thấp và bạn nên đối chiếu thêm với phòng ban phụ trách.'
                 if scenario == "low-confidence"
-                else f'Day la phan hoi tu /web backend cho cau hoi: "{question}". Assistant se uu tien tai lieu moi, co nguon va canh bao neu can.'
+                else f'Đây là phản hồi từ /web backend cho câu hỏi: "{question}". Assistant sẽ ưu tiên tài liệu mới, có nguồn và cảnh báo nếu cần.'
             ),
             "created_at": utc_now_iso(),
             "confidence": 0.35 if scenario == "low-confidence" else 0.86,
             "references": [
                 {
                     "id": "ref-response-001",
-                    "title": "Thong bao hoc phi hoc ky 2" if scenario == "low-confidence" else "Quy dinh hoc vu 2024-2025",
+                    "title": "Thông báo học phí học kỳ 2" if scenario == "low-confidence" else "Quy định học vụ 2024-2025",
                     "href": "/documents/doc-002" if scenario == "low-confidence" else "/documents/doc-001",
-                    "excerpt": "BFF mock reference excerpt used for frontend-backend contract alignment.",
+                    "excerpt": "Trích đoạn mô phỏng để kiểm tra hợp đồng dữ liệu giữa frontend và backend.",
                     "status_label": "Pending review" if scenario == "low-confidence" else "Approved",
                 }
             ],
             "warnings": (
-                [{"code": "low_confidence", "message": "Assistant confidence is low because metadata is incomplete."}]
+                [{"code": "low_confidence", "message": "Độ tin cậy đang thấp vì metadata chưa đầy đủ."}]
                 if scenario == "low-confidence"
                 else []
             ),
@@ -1071,12 +1224,12 @@ class InMemoryWorkspaceService:
         if document_number:
             parts.append(str(document_number))
         if valid_from and valid_until:
-            parts.append(f"Hieu luc tu {valid_from} den {valid_until}.")
+            parts.append(f"Hiệu lực từ {valid_from} đến {valid_until}.")
         elif valid_from:
-            parts.append(f"Co thong tin hieu luc tu {valid_from}.")
+            parts.append(f"Có thông tin hiệu lực từ {valid_from}.")
         if notes:
             parts.append(notes)
-        return " ".join(parts).strip() or "Tai lieu cong khai duoc phe duyet cho tra cuu tren UIT AI."
+        return " ".join(parts).strip() or "Tài liệu công khai được phê duyệt để tra cứu trên UIT AI."
 
     def _build_public_reference(self, document: dict) -> dict:
         return {
@@ -1087,13 +1240,39 @@ class InMemoryWorkspaceService:
             "status_label": self._status_label_for_reference_document(document),
         }
 
+    def _sanitize_lightrag_response_text(self, raw_response: str) -> str:
+        cleaned_lines: list[str] = []
+        for line in str(raw_response or "").splitlines():
+            stripped = line.strip()
+            normalized = normalize_search_text(stripped) if stripped else ""
+            if "tai lieu tham khao" in normalized or normalized in {"reference", "references"}:
+                break
+            if "admin-dashboard-public://" in line or "/uploads/" in line:
+                continue
+            cleaned_lines.append(line)
+        cleaned = "\n".join(cleaned_lines).strip()
+        cleaned = re.sub(
+            r"(?:\n|\r\n)?#{1,6}\s*(?:Tài liệu tham khảo|Tai lieu tham khao|References?)\s*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        ).strip()
+        cleaned = re.sub(r"(?:\n|\r\n)?---\s*$", "", cleaned).strip()
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
     def _public_workspace_source(self, document_id: str) -> str:
         return f"{PUBLIC_WORKSPACE_SOURCE_PREFIX}{document_id}"
+
+    def _internal_workspace_source(self, document_id: str) -> str:
+        return f"{INTERNAL_WORKSPACE_SOURCE_PREFIX}{document_id}"
 
     def _extract_document_id_from_public_source(self, file_path: str) -> str | None:
         normalized = str(file_path or "").strip()
         if normalized.startswith(PUBLIC_WORKSPACE_SOURCE_PREFIX):
             return normalized.removeprefix(PUBLIC_WORKSPACE_SOURCE_PREFIX).strip() or None
+        if normalized.startswith(INTERNAL_WORKSPACE_SOURCE_PREFIX):
+            return normalized.removeprefix(INTERNAL_WORKSPACE_SOURCE_PREFIX).strip() or None
         return None
 
     def _should_sync_document_to_public_workspace(self, document: dict) -> bool:
@@ -1103,42 +1282,48 @@ class InMemoryWorkspaceService:
             and not document.get("system_metadata", {}).get("is_archived", False)
         )
 
+    def _should_sync_document_to_internal_workspace(self, document: dict) -> bool:
+        return (
+            document.get("lifecycle_status") == "approved"
+            and not document.get("system_metadata", {}).get("is_archived", False)
+        )
+
     def _build_public_workspace_document_text(self, document: dict) -> str:
         temporal_metadata = document.get("temporal_metadata", {})
         supplemental_metadata = document.get("supplemental_metadata", {})
         traceability = document.get("traceability", {})
         lines = [
-            f"Tieu de: {document['title']}",
-            f"Trang thai cong bo: {document.get('lifecycle_status')}",
-            f"Pham vi hien thi: {supplemental_metadata.get('visibility_scope')}",
+            f"Tiêu đề: {document['title']}",
+            f"Trạng thái công bố: {document.get('lifecycle_status')}",
+            f"Phạm vi hiển thị: {supplemental_metadata.get('visibility_scope')}",
         ]
         document_number = temporal_metadata.get("document_number")
         if document_number:
-            lines.append(f"So hieu: {document_number}")
+            lines.append(f"Số hiệu: {document_number}")
         issuing_unit = supplemental_metadata.get("issuing_unit")
         if issuing_unit:
-            lines.append(f"Don vi ban hanh: {issuing_unit}")
+            lines.append(f"Đơn vị ban hành: {issuing_unit}")
         academic_year = temporal_metadata.get("academic_year")
         if academic_year:
-            lines.append(f"Nam hoc: {academic_year}")
+            lines.append(f"Năm học: {academic_year}")
         valid_from = temporal_metadata.get("valid_from")
         valid_until = temporal_metadata.get("valid_until")
         if valid_from and valid_until:
-            lines.append(f"Hieu luc: tu {valid_from} den {valid_until}")
+            lines.append(f"Hiệu lực: từ {valid_from} đến {valid_until}")
         elif valid_from:
-            lines.append(f"Hieu luc: tu {valid_from}")
+            lines.append(f"Hiệu lực: từ {valid_from}")
         cohort_years = temporal_metadata.get("cohort_years") or []
         if cohort_years:
-            lines.append(f"Cac khoa lien quan: {', '.join(cohort_years)}")
+            lines.append(f"Các khóa liên quan: {', '.join(cohort_years)}")
         tags = supplemental_metadata.get("tags") or []
         if tags:
-            lines.append(f"Nhan: {', '.join(tags)}")
+            lines.append(f"Nhãn: {', '.join(tags)}")
         notes = str(supplemental_metadata.get("notes") or "").strip()
         if notes:
-            lines.append(f"Ghi chu cong khai: {notes}")
+            lines.append(f"Ghi chú công khai: {notes}")
         publication_reason = str(traceability.get("publication_reason") or "").strip()
         if publication_reason:
-            lines.append(f"Ly do cong bo: {publication_reason}")
+            lines.append(f"Lý do công bố: {publication_reason}")
         return "\n".join(lines)
 
     def _sync_public_workspace_document(self, document: dict) -> dict:
@@ -1147,7 +1332,7 @@ class InMemoryWorkspaceService:
 
         client = get_public_lightrag_client()
         file_source = self._public_workspace_source(document["id"])
-        existing_ids = client.find_document_ids_by_file_path(file_source)
+        existing_ids = self._public_workspace_remote_document_ids(client, file_source)
         if existing_ids:
             client.delete_document(existing_ids)
 
@@ -1160,12 +1345,34 @@ class InMemoryWorkspaceService:
             return {"status": "error", "source": "lightrag-public", "raw": result}
         return {"status": "accepted", "source": "lightrag-public", "raw": result}
 
+    def _sync_internal_workspace_document(self, document: dict) -> dict:
+        if not settings.LIVE_INGESTION_MODE:
+            return {"status": "skipped", "source": "live-disabled"}
+
+        client = get_lightrag_client()
+        file_source = self._internal_workspace_source(document["id"])
+        existing_ids = self._internal_workspace_remote_document_ids(client, file_source)
+        if existing_ids:
+            client.delete_document(existing_ids)
+
+        result = client.insert_text(
+            self._build_public_workspace_document_text(document),
+            source=file_source,
+        )
+        if result.get("error"):
+            self._internal_workspace_seeded = False
+            return {"status": "error", "source": "lightrag-internal", "raw": result}
+        return {"status": "accepted", "source": "lightrag-internal", "raw": result}
+
     def _remove_public_workspace_document(self, document_id: str) -> dict:
         if not settings.LIVE_INGESTION_MODE or not settings.LIGHTRAG_PUBLIC_URL:
             return {"status": "skipped", "source": "public-live-disabled"}
 
         client = get_public_lightrag_client()
-        existing_ids = client.find_document_ids_by_file_path(self._public_workspace_source(document_id))
+        existing_ids = self._public_workspace_remote_document_ids(
+            client,
+            self._public_workspace_source(document_id),
+        )
         if not existing_ids:
             return {"status": "not_found", "source": "lightrag-public"}
         result = client.delete_document(existing_ids)
@@ -1174,12 +1381,155 @@ class InMemoryWorkspaceService:
             return {"status": "error", "source": "lightrag-public", "raw": result}
         return {"status": "deleted", "source": "lightrag-public", "raw": result}
 
+    def _public_workspace_remote_documents(self, client: Any, file_source: str) -> list[dict]:
+        if hasattr(client, "find_documents_by_file_path"):
+            documents = client.find_documents_by_file_path(file_source)
+            if isinstance(documents, list):
+                return [document for document in documents if isinstance(document, dict)]
+        document_ids = client.find_document_ids_by_file_path(file_source)
+        return [{"id": document_id, "status": "processed"} for document_id in document_ids]
+
+    def _internal_workspace_remote_documents(self, client: Any, file_source: str) -> list[dict]:
+        if hasattr(client, "find_documents_by_file_path"):
+            documents = client.find_documents_by_file_path(file_source)
+            if isinstance(documents, list):
+                return [document for document in documents if isinstance(document, dict)]
+        document_ids = client.find_document_ids_by_file_path(file_source)
+        return [{"id": document_id, "status": "processed"} for document_id in document_ids]
+
+    def _public_workspace_remote_document_ids(self, client: Any, file_source: str) -> list[str]:
+        return [
+            document_id
+            for document in self._public_workspace_remote_documents(client, file_source)
+            if (document_id := str(document.get("id") or "").strip())
+        ]
+
+    def _internal_workspace_remote_document_ids(self, client: Any, file_source: str) -> list[str]:
+        return [
+            document_id
+            for document in self._internal_workspace_remote_documents(client, file_source)
+            if (document_id := str(document.get("id") or "").strip())
+        ]
+
+    def _public_workspace_status_for_document(self, client: Any, document_id: str) -> str:
+        remote_documents = self._public_workspace_remote_documents(
+            client,
+            self._public_workspace_source(document_id),
+        )
+        if not remote_documents:
+            return "missing"
+        statuses = {str(document.get("status") or "").strip().lower() for document in remote_documents}
+        if "failed" in statuses:
+            return "failed"
+        if statuses & {"processing", "pending", "queued"}:
+            return "processing"
+        if statuses & {"processed", "completed", "success"}:
+            return "processed"
+        return "unknown"
+
+    def _internal_workspace_status_for_document(self, client: Any, document_id: str) -> str:
+        remote_documents = self._internal_workspace_remote_documents(
+            client,
+            self._internal_workspace_source(document_id),
+        )
+        if not remote_documents:
+            return "missing"
+        statuses = {str(document.get("status") or "").strip().lower() for document in remote_documents}
+        if "failed" in statuses:
+            return "failed"
+        if statuses & {"processing", "pending", "queued"}:
+            return "processing"
+        if statuses & {"processed", "completed", "success"}:
+            return "processed"
+        return "unknown"
+
     def _ensure_public_workspace_seeded(self) -> None:
         if self._public_workspace_seeded:
             return
         if not settings.LIVE_INGESTION_MODE or not settings.LIGHTRAG_PUBLIC_URL:
             return
 
+        client = get_public_lightrag_client()
+        synced_ok = True
+        ready = True
+        for document in self.store.list_all_documents():
+            try:
+                if self._should_sync_document_to_public_workspace(document):
+                    status = self._public_workspace_status_for_document(client, document["id"])
+                    if status == "processed":
+                        continue
+                    if status == "processing":
+                        ready = False
+                        continue
+                    result = self._sync_public_workspace_document(document)
+                    ready = False
+                else:
+                    result = self._remove_public_workspace_document(document["id"])
+                if result.get("status") == "error":
+                    synced_ok = False
+            except Exception:
+                synced_ok = False
+        self._public_workspace_seeded = synced_ok and ready
+
+    def _ensure_internal_workspace_seeded(self) -> None:
+        if self._internal_workspace_seeded:
+            return
+        if not settings.LIVE_INGESTION_MODE:
+            return
+
+        client = get_lightrag_client()
+        synced_ok = True
+        ready = True
+        for document in self.store.list_all_documents():
+            try:
+                if self._should_sync_document_to_internal_workspace(document):
+                    status = self._internal_workspace_status_for_document(client, document["id"])
+                    if status == "processed":
+                        continue
+                    if status == "processing":
+                        ready = False
+                        continue
+                    result = self._sync_internal_workspace_document(document)
+                    ready = False
+                else:
+                    result = {"status": "skipped", "source": "not-indexable"}
+                if result.get("status") == "error":
+                    synced_ok = False
+            except Exception:
+                synced_ok = False
+        self._internal_workspace_seeded = synced_ok and ready
+
+    def _wait_for_public_workspace_ready(self, timeout_seconds: int = 15) -> None:
+        if self._public_workspace_seeded:
+            return
+        if not settings.LIVE_INGESTION_MODE or not settings.LIGHTRAG_PUBLIC_URL:
+            return
+
+        deadline = datetime.now(UTC).timestamp() + timeout_seconds
+        while datetime.now(UTC).timestamp() < deadline:
+            self._ensure_public_workspace_seeded()
+            if self._public_workspace_seeded:
+                return
+            sleep(2)
+
+    def _wait_for_internal_workspace_ready(self, timeout_seconds: int = 15) -> None:
+        if self._internal_workspace_seeded:
+            return
+        if not settings.LIVE_INGESTION_MODE:
+            return
+
+        deadline = datetime.now(UTC).timestamp() + timeout_seconds
+        while datetime.now(UTC).timestamp() < deadline:
+            self._ensure_internal_workspace_seeded()
+            if self._internal_workspace_seeded:
+                return
+            sleep(2)
+
+    def _force_public_workspace_reseed(self) -> None:
+        if not settings.LIVE_INGESTION_MODE or not settings.LIGHTRAG_PUBLIC_URL:
+            return
+
+        self._public_workspace_seeded = False
         synced_ok = True
         for document in self.store.list_all_documents():
             try:
@@ -1191,7 +1541,29 @@ class InMemoryWorkspaceService:
                     synced_ok = False
             except Exception:
                 synced_ok = False
-        self._public_workspace_seeded = synced_ok
+        if not synced_ok:
+            return
+        self._wait_for_public_workspace_ready()
+
+    def _force_internal_workspace_reseed(self) -> None:
+        if not settings.LIVE_INGESTION_MODE:
+            return
+
+        self._internal_workspace_seeded = False
+        synced_ok = True
+        for document in self.store.list_all_documents():
+            try:
+                if self._should_sync_document_to_internal_workspace(document):
+                    result = self._sync_internal_workspace_document(document)
+                else:
+                    result = {"status": "skipped", "source": "not-indexable"}
+                if result.get("status") == "error":
+                    synced_ok = False
+            except Exception:
+                synced_ok = False
+        if not synced_ok:
+            return
+        self._wait_for_internal_workspace_ready()
 
     def _reconcile_document_public_workspace(self, document: dict | None) -> dict:
         if document is None:
@@ -1219,8 +1591,8 @@ class InMemoryWorkspaceService:
                 "id": f"msg-{uuid4().hex[:8]}",
                 "role": "assistant",
                 "content": (
-                    "Toi chua tim thay tai lieu cong khai phu hop trong he thong de tra loi cau hoi nay. "
-                    "Ban nen neu ro hon chu de hoac doi chieu them voi don vi phu trach cua UIT."
+                    "Tôi chưa tìm thấy tài liệu công khai phù hợp trong hệ thống để trả lời câu hỏi này. "
+                    "Bạn nên nêu rõ hơn chủ đề hoặc đối chiếu thêm với đơn vị phụ trách của UIT."
                 ),
                 "created_at": utc_now_iso(),
                 "confidence": 0.28,
@@ -1228,7 +1600,7 @@ class InMemoryWorkspaceService:
                 "warnings": [
                     {
                         "code": "low_confidence",
-                        "message": "Khong tim thay tai lieu cong khai co do phu hop du cao de dua ra cau tra loi co nguon.",
+                        "message": "Không tìm thấy tài liệu công khai có độ phù hợp đủ cao để đưa ra câu trả lời có nguồn.",
                     }
                 ],
             }
@@ -1241,23 +1613,23 @@ class InMemoryWorkspaceService:
         valid_until = temporal_metadata.get("valid_until")
         cohort_years = temporal_metadata.get("cohort_years") or []
 
-        summary_parts = [f'Tai lieu cong khai phu hop nhat hien tai la "{top_match["title"]}"']
+        summary_parts = [f'Tài liệu công khai phù hợp nhất hiện tại là "{top_match["title"]}"']
         if document_number:
             summary_parts[-1] += f" ({document_number})"
         summary_parts[-1] += "."
         if valid_from and valid_until:
-            summary_parts.append(f"Tai lieu nay co hieu luc tu {valid_from} den {valid_until}.")
+            summary_parts.append(f"Tài liệu này có hiệu lực từ {valid_from} đến {valid_until}.")
         elif valid_from:
-            summary_parts.append(f"Tai lieu nay ghi nhan moc ap dung tu {valid_from}.")
+            summary_parts.append(f"Tài liệu này ghi nhận mốc áp dụng từ {valid_from}.")
         if academic_year:
-            summary_parts.append(f"Du lieu dang gan voi nam hoc {academic_year}.")
+            summary_parts.append(f"Dữ liệu đang gắn với năm học {academic_year}.")
         if cohort_years:
-            summary_parts.append(f"Cac khoa duoc de cap gom {', '.join(cohort_years)}.")
+            summary_parts.append(f"Các khóa được đề cập gồm {', '.join(cohort_years)}.")
         notes = str(top_match["supplemental_metadata"].get("notes") or "").strip()
         if notes:
             summary_parts.append(notes)
         if top_match["lifecycle_status"] == "archived":
-            summary_parts.append("Day la tai lieu luu tru, ban nen doi chieu them voi thong bao moi nhat neu can xac nhan.")
+            summary_parts.append("Đây là tài liệu lưu trữ, bạn nên đối chiếu thêm với thông báo mới nhất nếu cần xác nhận.")
 
         warnings: list[dict] = []
         confidence = 0.76
@@ -1266,7 +1638,7 @@ class InMemoryWorkspaceService:
             warnings.append(
                 {
                     "code": "archived_source",
-                    "message": "Nguon tham chieu chinh la tai lieu da luu tru, co the khong con la huong dan moi nhat.",
+                    "message": "Nguồn tham chiếu chính là tài liệu đã lưu trữ, có thể không còn là hướng dẫn mới nhất.",
                 }
             )
         elif strong_matches[0]["score"] < 5.0:
@@ -1274,7 +1646,7 @@ class InMemoryWorkspaceService:
             warnings.append(
                 {
                     "code": "low_confidence",
-                    "message": "Da tim thay tai lieu cong khai lien quan, nhung ban nen doi chieu them voi phong ban phu trach.",
+                    "message": "Đã tìm thấy tài liệu công khai liên quan, nhưng bạn nên đối chiếu thêm với phòng ban phụ trách.",
                 }
             )
 
@@ -1348,14 +1720,14 @@ class InMemoryWorkspaceService:
                 "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
                 "title": document["title"],
                 "href": f"/documents/{document['id']}",
-                "excerpt": "Nguon duoc truy xuat tu co so tri thuc LightRAG va da duoc map ve tai lieu noi bo.",
+                "excerpt": "Nguồn được truy xuất từ cơ sở tri thức LightRAG và đã được ánh xạ về tài liệu nội bộ.",
                 "status_label": self._status_label_for_reference_document(document),
             }
         return {
             "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
-            "title": "Nguon tai lieu he thong",
+            "title": "Nguồn tài liệu hệ thống",
             "href": "/documents",
-            "excerpt": "Nguon duoc tra ve tu truy van LightRAG.",
+            "excerpt": "Nguồn được trả về từ truy vấn LightRAG.",
             "status_label": "Indexed",
         }
 
@@ -1371,13 +1743,15 @@ class InMemoryWorkspaceService:
             }
         return {
             "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
-            "title": "Tai lieu cong khai UIT",
+            "title": "Tài liệu công khai UIT",
             "href": "/documents",
-            "excerpt": "Nguon duoc tra ve tu khong gian tri thuc cong khai cua UIT AI.",
+            "excerpt": "Nguồn được trả về từ không gian tri thức công khai của UIT AI.",
             "status_label": "Approved",
         }
 
     def _build_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
+        self._ensure_internal_workspace_seeded()
+        self._wait_for_internal_workspace_ready()
         result = get_lightrag_client().query_text(
             question,
             conversation_history=self._build_chat_conversation_history(conversation),
@@ -1389,14 +1763,29 @@ class InMemoryWorkspaceService:
         if result.get("error"):
             self._raise(502, "lightrag_query_failed", "Live chat query failed while generating the answer.")
 
-        raw_response = str(result.get("response") or "").strip()
+        raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
         references = [self._build_live_reference(reference) for reference in result.get("references") or []]
         no_context = "no relevant context found" in raw_response.lower() or not raw_response
+        if no_context or not references:
+            self._force_internal_workspace_reseed()
+            result = get_lightrag_client().query_text(
+                question,
+                conversation_history=self._build_chat_conversation_history(conversation),
+                mode="mix",
+                include_references=True,
+                include_chunk_content=False,
+                response_type="Multiple Paragraphs",
+            )
+            if result.get("error"):
+                self._raise(502, "lightrag_query_failed", "Live chat query failed while generating the answer.")
+            raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
+            references = [self._build_live_reference(reference) for reference in result.get("references") or []]
+            no_context = "no relevant context found" in raw_response.lower() or not raw_response
         return {
             "id": f"msg-{uuid4().hex[:8]}",
             "role": "assistant",
             "content": (
-                "Toi chua tim thay ngu canh phu hop trong kho tri thuc hien tai. Ban nen dien dat cu the hon hoac doi chieu voi don vi phu trach."
+                "Tôi chưa tìm thấy ngữ cảnh phù hợp trong kho tri thức hiện tại. Bạn nên diễn đạt cụ thể hơn hoặc đối chiếu với đơn vị phụ trách."
                 if no_context
                 else raw_response
             ),
@@ -1404,7 +1793,7 @@ class InMemoryWorkspaceService:
             "confidence": 0.34 if no_context or not references else 0.82,
             "references": references,
             "warnings": (
-                [{"code": "low_confidence", "message": "Assistant confidence is low because the live retrieval did not return grounded references."}]
+                [{"code": "low_confidence", "message": "Độ tin cậy đang thấp vì truy vấn live chưa trả về nguồn tham chiếu đủ chắc chắn."}]
                 if no_context or not references
                 else []
             ),
@@ -1412,6 +1801,7 @@ class InMemoryWorkspaceService:
 
     def _build_public_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
         self._ensure_public_workspace_seeded()
+        self._wait_for_public_workspace_ready()
         result = get_public_lightrag_client().query_text(
             question,
             conversation_history=self._build_chat_conversation_history(conversation),
@@ -1423,11 +1813,27 @@ class InMemoryWorkspaceService:
         if result.get("error"):
             return self._build_public_catalog_chat_reply(question)
 
-        raw_response = str(result.get("response") or "").strip()
+        raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
         references = [self._build_public_live_reference(reference) for reference in result.get("references") or []]
         no_context = "no relevant context found" in raw_response.lower() or not raw_response
         if no_context or not references:
-            return self._build_public_catalog_chat_reply(question)
+            self._force_public_workspace_reseed()
+            result = get_public_lightrag_client().query_text(
+                question,
+                conversation_history=self._build_chat_conversation_history(conversation),
+                mode="mix",
+                include_references=True,
+                include_chunk_content=False,
+                response_type="Multiple Paragraphs",
+            )
+            if result.get("error"):
+                return self._build_public_catalog_chat_reply(question)
+
+            raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
+            references = [self._build_public_live_reference(reference) for reference in result.get("references") or []]
+            no_context = "no relevant context found" in raw_response.lower() or not raw_response
+            if no_context or not references:
+                return self._build_public_catalog_chat_reply(question)
 
         return {
             "id": f"msg-{uuid4().hex[:8]}",
@@ -1454,7 +1860,16 @@ class InMemoryWorkspaceService:
             return {"status": status, "url": url}
         return {"status": "healthy", "url": settings.LIGHTRAG_URL}
 
-    def _upsert_chat_conversation(self, conversation_id: str, question: str, reply: dict, existing_conversation: dict | None) -> None:
+    def _upsert_chat_conversation(
+        self,
+        conversation_id: str,
+        question: str,
+        reply: dict,
+        existing_conversation: dict | None,
+        owner_key: str | None,
+    ) -> None:
+        if owner_key is None:
+            return
         user_message = {
             "id": f"msg-{uuid4().hex[:8]}",
             "role": "user",
@@ -1474,19 +1889,34 @@ class InMemoryWorkspaceService:
         self.store.upsert_conversation(
             {
                 "id": conversation_id,
-                "title": question[:64] or "Cuoc tro chuyen moi",
+                "owner_key": owner_key,
+                "title": question[:64] or "Cuộc trò chuyện mới",
                 "updated_at": reply["created_at"],
                 "messages": [user_message, deepcopy(reply)],
             }
         )
 
-    def send_chat_message(self, payload: dict, scenario: str, role: Role = "guest") -> dict:
+    def send_chat_message(
+        self,
+        payload: dict,
+        scenario: str,
+        role: Role = "guest",
+        session: dict | None = None,
+        session_token: str | None = None,
+    ) -> dict:
         if scenario == "error":
             self._raise(500, "chat_failed", "Unable to generate assistant response.")
 
-        question = payload.get("message") or "Can you clarify the request?"
+        question = payload.get("message") or "Bạn có thể nói rõ hơn yêu cầu không?"
         conversation_id = payload.get("conversationId") or f"conv-{uuid4().hex[:8]}"
-        existing_conversation = self.store.get_conversation_by_id(conversation_id)
+        owner_key = self._conversation_owner_key(role, session, session_token)
+        owner_aliases = self._conversation_owner_aliases(role, session, session_token)
+        raw_conversation = self.store.get_conversation_by_id(conversation_id)
+        if raw_conversation is not None:
+            raw_conversation = self._ensure_conversation_owner(raw_conversation, owner_key, owner_aliases)
+        if raw_conversation is not None and not self._conversation_visible_to_owner(raw_conversation, owner_key, owner_aliases):
+            self._raise(404, "conversation_not_found", "Không tìm thấy cuộc trò chuyện.")
+        existing_conversation = raw_conversation
         if self._should_use_live_chat(role, scenario):
             reply = self._build_live_chat_reply(question, existing_conversation)
         elif self._should_use_public_live_chat(role, scenario):
@@ -1495,7 +1925,7 @@ class InMemoryWorkspaceService:
             reply = self._build_public_catalog_chat_reply(question)
         else:
             reply = self._build_mock_chat_reply(question, scenario)
-        self._upsert_chat_conversation(conversation_id, question, reply, existing_conversation)
+        self._upsert_chat_conversation(conversation_id, question, reply, existing_conversation, owner_key)
         if self._is_document_admin(role):
             return {"conversation_id": conversation_id, "message": reply}
         return {
