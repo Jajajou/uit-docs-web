@@ -254,8 +254,7 @@ export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?:
                         </div>
                         <div>
                             <span className="font-semibold text-gray-900 dark:text-white">Published at:</span>{' '}
-                            {formatDateTime(submission.traceability?.publishedAt)}
-                        </div>
+                            {submission.traceability?.publishedAt ? formatDateTime(submission.traceability.publishedAt) : '—'}                        </div>
                         <div>
                             <span className="font-semibold text-gray-900 dark:text-white">Decision reason:</span>{' '}
                             {submission.traceability?.publicationReason ?? 'No publication reason recorded'}

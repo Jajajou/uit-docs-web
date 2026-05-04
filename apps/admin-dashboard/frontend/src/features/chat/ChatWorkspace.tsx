@@ -14,8 +14,8 @@ import {
     Sparkles,
 } from 'lucide-react'
 import { RouteIntentLink } from '@/app/router/RouteIntentLink'
-import { useConversationsQuery, useSendChatMessageMutation } from '@/entities/chat/queries'
-import type { AnswerReference, Message } from '@/entities/chat/types'
+import { useChatStream, useConversationsQuery, useSendChatMessageMutation } from '@/entities/chat/queries'
+import type { Message } from '@/entities/chat/types'
 import { cn } from '@/shared/lib/cn'
 import { formatDateTime, formatPercent } from '@/shared/lib/format'
 import { Badge, Button, Card, EmptyState, Input } from '@/shared/ui'
@@ -141,6 +141,7 @@ function TypingIndicator() {
 export function ChatWorkspace({ scenario }: { scenario?: string }) {
     const conversationsQuery = useConversationsQuery({ scenario })
     const sendMessageMutation = useSendChatMessageMutation({ scenario })
+    const streamChat = useChatStream({ assistantId: 'agent' })
     const [selectedConversationId, setSelectedConversationId] = useState('conv-001')
     const [canvasMode, setCanvasMode] = useState<ChatCanvasMode>('fresh')
     const [draft, setDraft] = useState('')
@@ -195,7 +196,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         [localMessagesByConversation, selectedConversation],
     )
 
-    const displayedMessages = canvasMode === 'fresh' ? freshMessages : historyMessages
+    const displayedMessages = canvasMode === 'fresh' ? (streamChat.messages.length > 0 ? streamChat.messages : freshMessages) : historyMessages
 
     const latestAssistantMessage = useMemo(
         () => [...displayedMessages].reverse().find((message) => message.role === 'assistant'),
@@ -210,7 +211,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
 
     useEffect(() => {
         messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }, [displayedMessages, sendMessageMutation.isPending])
+    }, [displayedMessages, sendMessageMutation.isPending, streamChat.isLoading])
 
     const activeReferenceMessage = useMemo(() => {
         if (!activeReferenceMessageId) {
@@ -245,6 +246,17 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         }
 
         const message = draft.trim()
+        
+        if (canvasMode === 'fresh') {
+            setDraft('')
+            try {
+                await streamChat.sendMessage(message)
+            } catch {
+                // streamChat handles its own error state
+            }
+            return
+        }
+
         const localUserMessage: Message = {
             id: `local-user-${crypto.randomUUID()}`,
             role: 'user',
@@ -255,23 +267,6 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         }
 
         setDraft('')
-
-        if (canvasMode === 'fresh') {
-            startTransition(() => {
-                setFreshMessages((current) => [...current, localUserMessage])
-            })
-
-            try {
-                const assistantMessage = await sendMessageMutation.mutateAsync({ message })
-                startTransition(() => {
-                    setFreshMessages((current) => [...current, assistantMessage])
-                })
-            } catch {
-                // Mutation state already surfaces the error.
-            }
-
-            return
-        }
 
         if (!selectedConversation) {
             return
@@ -398,14 +393,11 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                                                     : 'border-transparent bg-white/70 hover:border-gray-200 hover:bg-white dark:bg-white/[0.03] dark:hover:border-white/10 dark:hover:bg-white/[0.05]',
                                             )}
                                         >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <div className="truncate text-sm font-semibold text-gray-950 dark:text-white">{conversation.title}</div>
-                                                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
-                                                        {conversation.messages[conversation.messages.length - 1]?.content ?? 'Chưa có nội dung'}
-                                                    </div>
-                                                </div>
-                                                <div className="shrink-0 text-[11px] text-gray-400">{formatDateTime(conversation.updatedAt)}</div>
+                                            <div className="line-clamp-1 text-[15px] font-semibold text-gray-950 dark:text-white">{conversation.title}</div>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{formatDateTime(conversation.updatedAt)}</div>
+                                                <div className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                                                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{conversation.messages.length} tin nhắn</div>
                                             </div>
                                         </button>
                                     )
@@ -414,10 +406,8 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                         </motion.aside>
                     </>
                 ) : null}
-            </AnimatePresence>
 
-            <AnimatePresence>
-                {isReferencePanelOpen && activeReferenceMessage ? (
+                {isReferencePanelOpen ? (
                     <>
                         <motion.button
                             type="button"
@@ -425,7 +415,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsReferencePanelOpen(false)}
-                            className="absolute inset-0 z-10 bg-brand-950/10 backdrop-blur-[2px] md:hidden"
+                            className="absolute inset-0 z-10 bg-brand-950/10 backdrop-blur-[2px] xl:hidden"
                             aria-label="Đóng nguồn tài liệu"
                         />
                         <motion.aside
@@ -433,20 +423,20 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: 28, opacity: 0 }}
                             transition={{ duration: 0.2, ease: 'easeOut' }}
-                            className="absolute right-0 top-0 z-20 flex h-full w-full max-w-[24rem] flex-col gap-4 border-l border-white/60 bg-white/94 p-4 shadow-theme-lg backdrop-blur-xl dark:border-white/8 dark:bg-[#0a1220]/94 md:p-5"
+                            className="absolute right-0 top-0 z-20 flex h-full w-full max-w-[22rem] flex-col gap-4 border-l border-white/60 bg-white/92 p-4 shadow-theme-lg backdrop-blur-xl dark:border-white/8 dark:bg-[#0a1220]/92 md:p-5"
                         >
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Nguồn tài liệu</div>
-                                    <div className="text-lg font-semibold text-gray-950 dark:text-white">Nguồn đang được trích dẫn</div>
+                                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Trích dẫn</div>
+                                    <div className="text-lg font-semibold text-gray-950 dark:text-white">Nguồn tài liệu ({activeReferenceCount})</div>
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => setIsReferencePanelOpen(false)}>
                                     <ChevronRight size={16} />
                                 </Button>
                             </div>
 
-                            <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-1">
-                                {activeReferenceMessage.references.map((reference: AnswerReference) => {
+                            <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
+                                {activeReferenceMessage?.references.map((reference) => {
                                     const meta = getReferenceStatusMeta(reference.statusLabel)
 
                                     return (
@@ -528,7 +518,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                                 ),
                             )}
 
-                            {sendMessageMutation.isPending ? <TypingIndicator /> : null}
+                            {sendMessageMutation.isPending || streamChat.isLoading ? <TypingIndicator /> : null}
                             <div ref={messageEndRef} />
                         </div>
                     </div>
@@ -561,7 +551,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                                 />
                             </div>
 
-                            <Button size="lg" className="md:min-w-32" onClick={() => void sendDraftMessage()} disabled={!draft.trim()}>
+                            <Button size="lg" className="md:min-w-32" onClick={() => void sendDraftMessage()} disabled={!draft.trim() || streamChat.isLoading}>
                                 <Send size={16} />
                                 Gửi
                             </Button>
