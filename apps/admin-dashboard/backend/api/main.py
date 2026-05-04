@@ -12,7 +12,16 @@ from fastapi.responses import JSONResponse
 
 from api.config import settings
 from api.errors import ApiServiceError, build_error_response
-from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, student_chat, submissions, test_support, upload
+from api.routers.admin import router as admin_router
+from api.routers.analytics import router as analytics_router
+from api.routers.auth import router as auth_router
+from api.routers.chat import router as chat_router
+from api.routers.documents import router as documents_router
+from api.routers.jobs import router as jobs_router
+from api.routers.reviews import router as reviews_router
+from api.routers.student_chat import router as student_chat_router
+from api.routers.submissions import router as submissions_router
+from api.routers.upload import router as upload_router
 from api.security import apply_security_headers, build_https_redirect_response, enforce_trusted_host
 
 
@@ -86,18 +95,17 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     return apply_security_headers(response)
 
 
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
-app.include_router(student_chat.router, prefix="/api/student", tags=["Student Chat"])
-app.include_router(upload.router, prefix="/api/uploads", tags=["Uploads"])
-app.include_router(upload.router, prefix="/api/upload", tags=["Legacy Upload"])
-app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
-app.include_router(submissions.router, prefix="/api/submissions", tags=["Submissions"])
-app.include_router(reviews.router, prefix="/api/reviews", tags=["Reviews"])
-app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(test_support.router, prefix="/api/test", tags=["Test Support"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
+app.include_router(student_chat_router, prefix="/api/student", tags=["Student Chat"])
+app.include_router(upload_router, prefix="/api/uploads", tags=["Uploads"])
+app.include_router(upload_router, prefix="/api/upload", tags=["Legacy Upload"])
+app.include_router(documents_router, prefix="/api/documents", tags=["Documents"])
+app.include_router(submissions_router, prefix="/api/submissions", tags=["Submissions"])
+app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
+app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
+app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
+app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 
 
 @app.get("/health")

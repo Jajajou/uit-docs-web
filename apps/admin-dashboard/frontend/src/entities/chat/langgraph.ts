@@ -5,4 +5,8 @@ const API_URL = typeof window !== "undefined" ? `${window.location.origin}/api/s
 
 export const langgraphClient = new Client({
   apiUrl: API_URL,
+  // Ensure the client doesn't try to use default LangChain Cloud versioning if we're on a custom proxy
+  defaultHeaders: {
+    'Content-Type': 'application/json',
+  }
 });

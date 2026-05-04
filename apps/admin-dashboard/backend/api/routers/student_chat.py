@@ -1,36 +1,59 @@
 import json
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from api.config import settings
-from api.schemas import ChatStreamRequest
 
 router = APIRouter()
 
-@router.post("/chat")
-async def student_chat(request: ChatStreamRequest):
+async def langgraph_proxy_impl(request: Request, path: str):
     """
-    Proxy student chat requests to the LangGraph RAG pipeline.
-    Supports streaming responses via SSE.
+    Core implementation of the wildcard proxy.
     """
+    # LangGraph SDK often adds /v1/ prefix, but local server might not use it
+    target_path = path
+    if target_path.startswith("v1/"):
+        target_path = target_path.replace("v1/", "", 1)
+        
+    url = f"{settings.LANGGRAPH_URL}/{target_path}"
+    
+    # Forward query params
+    params = dict(request.query_params)
+    
+    # Get body for POST/PUT
+    body = await request.body()
+    
+    # Forward headers, but remove host and content-length to avoid proxy conflicts
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length", "connection")}
+    
     async def stream_generator():
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             try:
-                # Proxy to LangGraph
+                # Stream the request to LangGraph server
                 async with client.stream(
-                    "POST", 
-                    f"{settings.LANGGRAPH_URL}/api/chat", 
-                    json={"query": request.message}
+                    request.method,
+                    url,
+                    params=params,
+                    content=body,
+                    headers=headers,
                 ) as response:
-                    if response.status_code != 200:
-                        yield f"data: {json.dumps({'error': f'LangGraph service error: {response.status_code}'})}\n\n"
-                        return
-
-                    async for chunk in response.aiter_text():
+                    # Stream the response back to the frontend
+                    async for chunk in response.aiter_bytes():
                         yield chunk
-            except httpx.ConnectError:
-                yield f"data: {json.dumps({'error': 'Cannot connect to LangGraph service. Ensure it is running on port 2024.'})}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'error': f'Internal proxy error: {str(e)}'})}\n\n"
+                # Return a formatted SSE error
+                error_data = json.dumps({'error': f'Proxy error: {str(e)}'})
+                yield f"data: {error_data}\n\n".encode()
 
-    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_generator(),
+        media_type="text/event-stream"
+    )
+
+@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def langgraph_proxy_wildcard(request: Request, path: str):
+    return await langgraph_proxy_impl(request, path)
+
+@router.api_route("/", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
+async def langgraph_proxy_root(request: Request):
+    return await langgraph_proxy_impl(request, "")

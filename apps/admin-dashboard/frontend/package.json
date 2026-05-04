@@ -18,6 +18,7 @@
     },
     "dependencies": {
         "@langchain/langgraph-sdk": "^1.8.10",
+        "@langchain/react": "^0.3.5",
         "@radix-ui/react-dialog": "^1.1.15",
         "@radix-ui/react-dropdown-menu": "^2.1.6",
         "@radix-ui/react-progress": "^1.1.7",

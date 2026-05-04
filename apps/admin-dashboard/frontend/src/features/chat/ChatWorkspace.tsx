@@ -8,7 +8,6 @@ import {
     GraduationCap,
     History,
     Loader2,
-    MessageSquareText,
     Search,
     Send,
     Sparkles,
@@ -18,7 +17,7 @@ import { useChatStream, useConversationsQuery, useSendChatMessageMutation } from
 import type { Message } from '@/entities/chat/types'
 import { cn } from '@/shared/lib/cn'
 import { formatDateTime, formatPercent } from '@/shared/lib/format'
-import { Badge, Button, Card, EmptyState, Input } from '@/shared/ui'
+import { Badge, Button, Card, Input } from '@/shared/ui'
 
 const quickPrompts = [
     { label: 'Học phí học kỳ này được tính như thế nào?', icon: GraduationCap },
@@ -246,13 +245,13 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         }
 
         const message = draft.trim()
+        setDraft('')
         
         if (canvasMode === 'fresh') {
-            setDraft('')
             try {
                 await streamChat.sendMessage(message)
-            } catch {
-                // streamChat handles its own error state
+            } catch (err) {
+                console.error('LangGraph stream error:', err)
             }
             return
         }
@@ -266,13 +265,8 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
             warnings: [],
         }
 
-        setDraft('')
-
-        if (!selectedConversation) {
-            return
-        }
-
-        const conversationId = selectedConversation.id
+        const conversationId = selectedConversation?.id
+        if (!conversationId) return
 
         startTransition(() => {
             setLocalMessagesByConversation((current) => ({
@@ -290,7 +284,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                 }))
             })
         } catch {
-            // Mutation state already surfaces the error.
+            // Mutation error handled by UI
         }
     }
 
@@ -300,18 +294,6 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
 
     if (conversationsQuery.isError) {
         return <Card className="mx-4 my-6 text-sm text-error-700 dark:text-error-300 md:mx-6">{conversationsQuery.error.message}</Card>
-    }
-
-    if (!conversationsQuery.data || conversationsQuery.data.length === 0) {
-        return (
-            <div className="px-4 py-6 md:px-6">
-                <EmptyState
-                    icon={MessageSquareText}
-                    title="Chưa có cuộc trò chuyện"
-                    description="Workspace chat sẽ hiển thị ở đây sau khi mock data hoặc backend sẵn sàng."
-                />
-            </div>
-        )
     }
 
     return (
