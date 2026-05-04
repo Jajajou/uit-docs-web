@@ -37,6 +37,9 @@ class Settings:
     LIGHTRAG_PUBLIC_USERNAME: str = os.getenv("LIGHTRAG_PUBLIC_USERNAME", os.getenv("LIGHTRAG_USERNAME", "admin"))
     LIGHTRAG_PUBLIC_PASSWORD: str = os.getenv("LIGHTRAG_PUBLIC_PASSWORD", os.getenv("LIGHTRAG_PASSWORD", "admin"))
 
+    # LangGraph service
+    LANGGRAPH_URL: str = os.getenv("LANGGRAPH_URL", "http://localhost:2024")
+
     # File Upload
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", str(Path(__file__).parent.parent / "uploads"))
     UPLOAD_STAGING_DIR: str = os.getenv("UPLOAD_STAGING_DIR", str(Path(__file__).parent.parent / "uploads" / "staging"))

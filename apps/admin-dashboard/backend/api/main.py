@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from api.config import settings
 from api.errors import ApiServiceError, build_error_response
-from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, submissions, test_support, upload
+from api.routers import admin, analytics, auth, chat, documents, jobs, reviews, student_chat, submissions, test_support, upload
 from api.security import apply_security_headers, build_https_redirect_response, enforce_trusted_host
 
 
@@ -88,6 +88,7 @@ async def unhandled_error_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(student_chat.router, prefix="/api/student", tags=["Student Chat"])
 app.include_router(upload.router, prefix="/api/uploads", tags=["Uploads"])
 app.include_router(upload.router, prefix="/api/upload", tags=["Legacy Upload"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
