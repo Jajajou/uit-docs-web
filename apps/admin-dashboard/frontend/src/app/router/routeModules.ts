@@ -9,6 +9,11 @@ export const loadLoginPage = () => import('@/pages/auth/LoginPage')
 export const loadAuthCallbackPage = () => import('@/pages/auth/AuthCallbackPage')
 
 export const loadUploadPage = () => import('@/pages/portal/UploadPage')
+export const loadPortalOverviewPage = () => import('@/pages/portal/PortalOverviewPage')
+export const loadSubmissionsPage = () => import('@/pages/portal/SubmissionsPage')
+export const loadSubmissionDetailPage = () => import('@/pages/portal/SubmissionDetailPage')
+export const loadReviewPage = () => import('@/pages/portal/ReviewPage')
+export const loadJobsPage = () => import('@/pages/portal/JobsPage')
 export const loadManagerPage = () => import('@/pages/manager/ManagerPage')
 
 export const loadForbiddenPage = () => import('@/pages/system/ForbiddenPage')
@@ -37,13 +42,37 @@ const routePreloaders: RoutePreloader[] = [
     },
     {
         key: 'app-documents',
-        matches: (pathname) => pathname === '/documents' || pathname === '/library',
+        matches: (pathname) => pathname === '/documents' || pathname === '/library' || pathname === '/portal/library',
         load: () => Promise.all([loadAppLayout(), loadLibraryPage()]),
     },
     {
         key: 'app-upload',
-        matches: (pathname) => pathname === '/upload' || pathname === '/knowledge',
+        matches: (pathname) => pathname === '/upload' || pathname === '/knowledge' || pathname === '/portal/upload',
         load: () => Promise.all([loadAppLayout(), loadUploadPage()]),
+    },
+    {
+        key: 'app-portal',
+        matches: (pathname) => pathname === '/portal',
+        load: () => Promise.all([loadAppLayout(), loadPortalOverviewPage()]),
+    },
+    {
+        key: 'app-submissions',
+        matches: (pathname) =>
+            pathname === '/submissions' ||
+            pathname.startsWith('/submissions/') ||
+            pathname === '/portal/submissions' ||
+            pathname.startsWith('/portal/submissions/'),
+        load: () => Promise.all([loadAppLayout(), loadSubmissionsPage(), loadSubmissionDetailPage()]),
+    },
+    {
+        key: 'app-review',
+        matches: (pathname) => pathname === '/review' || pathname === '/portal/review',
+        load: () => Promise.all([loadAppLayout(), loadReviewPage()]),
+    },
+    {
+        key: 'app-jobs',
+        matches: (pathname) => pathname === '/jobs' || pathname === '/portal/jobs',
+        load: () => Promise.all([loadAppLayout(), loadJobsPage()]),
     },
     {
         key: 'app-manager',

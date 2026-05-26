@@ -8,23 +8,23 @@ test.beforeEach(async ({ page }) => {
 test('live backend bootstrap resolves teacher into upload workspace', async ({ page }) => {
     await loginAsLiveRole(page, 'teacher')
     await expect(page).toHaveURL(/\/upload$/)
-    await expect(page.getByRole('heading', { name: /Náº¡p tÃ i liá»‡u vÃ o luá»“ng duyá»‡t ná»™i bá»™/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Nạp tài liệu vào luồng duyệt nội bộ/i })).toBeVisible()
 })
 
 test('live backend chat responds through the proxied /web BFF', async ({ page }) => {
     await loginAsLiveRole(page, 'student')
 
     await expect(page.getByRole('heading', { name: 'UIT AI' })).toBeVisible()
-    await page.getByLabel('Há»i UIT AI').fill('Lá»‹ch Ä‘Äƒng kÃ½ mÃ´n há»c cá»§a khÃ³a 2024 báº¯t Ä‘áº§u khi nÃ o?')
-    await page.getByRole('button', { name: /Gá»­i/i }).click()
+    await page.getByLabel('Hỏi UIT AI').fill('Lịch đăng ký môn học của khóa 2024 bắt đầu khi nào?')
+    await page.getByRole('button', { name: /Gửi/i }).click()
 
-    const sourceButton = page.getByRole('button', { name: /Nguá»“n tÃ i liá»‡u/i }).last()
+    const sourceButton = page.getByRole('button', { name: /Nguồn tài liệu/i }).last()
     await expect(sourceButton).toBeVisible()
     await sourceButton.click()
-    await expect(page.getByText(/Nguá»“n Ä‘ang Ä‘Æ°á»£c trÃ­ch dáº«n/i)).toBeVisible()
+    await expect(page.getByText(/Nguồn đang được trích dẫn/i)).toBeVisible()
     await expect(page.getByText(/Thong bao lich dang ky mon hoc|Quy dinh hoc vu 2024-2025/i).first()).toBeVisible()
     await page.locator('aside a').first().click()
-    await expect(page.getByRole('heading', { name: /Chi tiáº¿t tÃ i liá»‡u/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Chi tiết tài liệu/i })).toBeVisible()
 })
 
 test('live backend document actions update detail state for admin workflows', async ({ page }) => {
@@ -32,12 +32,12 @@ test('live backend document actions update detail state for admin workflows', as
 
     await page.goto('/documents/doc-004')
 
-    await expect(page.getByRole('button', { name: /Láº­p chá»‰ má»¥c láº¡i/i })).toBeVisible()
-    await page.getByRole('button', { name: /Láº­p chá»‰ má»¥c láº¡i/i }).click()
-    await expect(page.getByText(/xáº¿p hÃ ng láº­p chá»‰ má»¥c láº¡i/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /Lập chỉ mục lại/i })).toBeVisible()
+    await page.getByRole('button', { name: /Lập chỉ mục lại/i }).click()
+    await expect(page.getByText(/xếp hàng lập chỉ mục lại/i)).toBeVisible()
 
     await page.goto('/manager')
-    await expect(page.getByRole('heading', { name: /PhÃ¢n quyá»n ngÆ°á»i dÃ¹ng vÃ  kiá»ƒm soÃ¡t ná»™i bá»™/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Phân quyền người dùng và kiểm soát nội bộ/i })).toBeVisible()
 })
 
 test('live backend auth error remains distinct from access denied', async ({ page }) => {
@@ -52,9 +52,9 @@ test('live backend auth error remains distinct from access denied', async ({ pag
 test('live backend blocks non-compliant internal bootstrap before portal access', async ({ page }) => {
     await page.goto('/auth/callback?bootstrap=1&role=teacher&scenario=non-compliant-internal-email')
 
-    await expect(page.getByRole('heading', { name: /KhÃ´ng thá»ƒ xÃ¡c thá»±c phiÃªn lÃ m viá»‡c/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Không thể xác thực phiên làm việc/i })).toBeVisible()
     await expect(page.getByText(/does not satisfy the institutional domain rule/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: /Thá»­ bootstrap láº¡i/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Thử bootstrap lại/i })).toBeVisible()
 })
 
 test('live backend denies student access to protected portal routes after login', async ({ page }) => {
@@ -67,9 +67,9 @@ test('live backend denies student access to protected portal routes after login'
 
 test('live backend logout clears the session cookie and blocks protected routes', async ({ page }) => {
     await loginAsLiveRole(page, 'admin')
-    await expect(page.getByRole('button', { name: /ÄÄƒng xuáº¥t/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Đăng xuất/i })).toBeVisible()
 
-    await page.getByRole('button', { name: /ÄÄƒng xuáº¥t/i }).click()
+    await page.getByRole('button', { name: /Đăng xuất/i }).click()
     await expect(page).toHaveURL(/\/(auth\/login|403)$/)
 
     await page.goto('/manager')

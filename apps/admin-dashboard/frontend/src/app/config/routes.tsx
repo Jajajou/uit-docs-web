@@ -1,9 +1,12 @@
 import {
     Bot,
-    Upload,
-    ShieldCheck,
+    ClipboardCheck,
+    FileSearch,
+    ListChecks,
     LogIn,
-    FileSearch
+    ScrollText,
+    ShieldCheck,
+    Upload,
 } from 'lucide-react'
 import { matchPath } from 'react-router-dom'
 import { appRoles, isInternalRole } from '@/entities/auth/roles'
@@ -32,9 +35,20 @@ export const routeMeta: AppRouteMeta[] = [
     { path: '/chat', title: 'Chat', shell: 'app', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
     { path: '/documents', title: 'Tài liệu', shell: 'app', allowedRoles: allRoles, navLabel: 'Tài liệu', icon: FileSearch },
     { path: '/library', title: 'Tài liệu', shell: 'app', allowedRoles: allRoles },
+    { path: '/portal/library', title: 'Tài liệu', shell: 'app', allowedRoles: allRoles },
+    { path: '/portal', title: 'Cổng nội bộ', shell: 'app', allowedRoles: portalContributorRoles },
     { path: '/knowledge', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles },
     { path: '/documents/:id', title: 'Chi tiết tài liệu', shell: 'app', allowedRoles: allRoles, navLabel: 'Tài liệu', icon: FileSearch },
     { path: '/upload', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles, navLabel: 'Tải lên', icon: Upload },
+    { path: '/portal/upload', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles },
+    { path: '/submissions', title: 'Hàng nộp', shell: 'app', allowedRoles: portalContributorRoles, navLabel: 'Hàng nộp', icon: ClipboardCheck },
+    { path: '/portal/submissions', title: 'Hàng nộp', shell: 'app', allowedRoles: portalContributorRoles },
+    { path: '/submissions/:id', title: 'Chi tiết phiếu nộp', shell: 'app', allowedRoles: portalContributorRoles, navLabel: 'Hàng nộp', icon: ClipboardCheck },
+    { path: '/portal/submissions/:id', title: 'Chi tiết phiếu nộp', shell: 'app', allowedRoles: portalContributorRoles },
+    { path: '/review', title: 'Duyệt tài liệu', shell: 'app', allowedRoles: adminControlRoles, navLabel: 'Duyệt', icon: ListChecks },
+    { path: '/portal/review', title: 'Duyệt tài liệu', shell: 'app', allowedRoles: adminControlRoles },
+    { path: '/jobs', title: 'Tiến trình index', shell: 'app', allowedRoles: adminControlRoles, navLabel: 'Tiến trình', icon: ScrollText },
+    { path: '/portal/jobs', title: 'Tiến trình index', shell: 'app', allowedRoles: adminControlRoles },
     { path: '/manager', title: 'Quản trị', shell: 'app', allowedRoles: adminControlRoles, navLabel: 'Quản trị', icon: ShieldCheck },
     { path: '/auth/login', title: 'Đăng nhập', shell: 'auth', allowedRoles: allRoles, navLabel: 'Đăng nhập', icon: LogIn },
     { path: '/auth/callback', title: 'Xác thực', shell: 'auth', allowedRoles: allRoles },

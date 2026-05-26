@@ -103,7 +103,8 @@ function getConversationOwnerKey(request: MockRequestDescriptor) {
 }
 
 function toConversationDto(conversation: MockConversationRecord): ConversationDto {
-    const { owner_key: _ownerKey, ...payload } = conversation
+    const payload = { ...conversation }
+    delete payload.owner_key
     return payload
 }
 

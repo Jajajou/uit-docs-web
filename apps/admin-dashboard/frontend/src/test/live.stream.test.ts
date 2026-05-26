@@ -89,7 +89,7 @@ describe('LangGraph live chat helpers', () => {
             }),
         ).toEqual({
             apiUrl: '/api/langgraph',
-            assistantId: 'retrieval',
+            assistantId: '5bbc8364-e383-5087-8a2f-b6d27677f7a1',
             enabled: true,
         })
     })

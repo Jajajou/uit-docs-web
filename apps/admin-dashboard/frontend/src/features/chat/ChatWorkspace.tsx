@@ -1,5 +1,5 @@
 import { useStream } from '@langchain/langgraph-sdk/react'
-import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
     ArrowRight,
@@ -171,7 +171,7 @@ function formatAssistantContent(content: string) {
 }
 
 function normalizeAssistantHeading(line: string) {
-    return line.trim().replace(/^[\u{1F449}\u261D\uFE0F\u2705\u2757\uFE0F\u27A1\uFE0F\u2022]+\s*/u, '')
+    return line.trim().replace(/^(?:(?:\u{1F449}|\u261D|\u2705|\u2757|\u27A1)\uFE0F?|\u2022)+\s*/u, '')
 }
 
 function normalizeComparableText(value?: string) {
@@ -352,7 +352,7 @@ function CitationPreview({ reference, index }: { reference: AnswerReference; ind
             <button
                 type="button"
                 aria-label={`Nguồn ${index + 1}: ${reference.title}`}
-                className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-brand-200 bg-brand-50/92 px-2 text-[11px] font-semibold text-brand-700 transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/15 dark:border-brand-800 dark:bg-brand-950/50 dark:text-brand-200 dark:hover:border-brand-700 dark:hover:bg-brand-950/70"
+                className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-brand-200 bg-brand-50/92 px-3 text-[12px] font-semibold text-brand-700 transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/15 dark:border-brand-800 dark:bg-brand-950/50 dark:text-brand-200 dark:hover:border-brand-700 dark:hover:bg-brand-950/70"
             >
                 [{index + 1}]
             </button>
@@ -592,7 +592,7 @@ function HistorySidebarContent({
                                                     onClick={() => void onDeleteConversation(conversation.id)}
                                                     disabled={deletePending}
                                                     aria-label={`Xóa ${conversation.title}`}
-                                                    className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white hover:text-error-600 disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-error-300"
+                                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-white hover:text-error-600 disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-error-300"
                                                 >
                                                     <Trash2 size={15} />
                                                 </button>
@@ -614,7 +614,7 @@ function HistorySidebarContent({
                             type="button"
                             onClick={onClearConversations}
                             disabled={clearPending}
-                            className="text-xs font-semibold text-gray-500 transition-colors hover:text-error-600 disabled:opacity-40 dark:text-gray-300 dark:hover:text-error-300"
+                            className="inline-flex min-h-10 items-center rounded-full px-2 text-xs font-semibold text-gray-500 transition-colors hover:text-error-600 disabled:opacity-40 dark:text-gray-300 dark:hover:text-error-300"
                         >
                             Xóa lịch sử
                         </button>
@@ -949,12 +949,15 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         }
     }, [liveStreamConfig.apiUrl, liveStreamConfig.enabled, liveStreamConfig.fetch])
 
-    const liveStreamError =
-        liveStream.error instanceof Error
-            ? liveStream.error
-            : liveStream.error
-              ? new Error(String(liveStream.error))
-              : null
+    const liveStreamError = useMemo(
+        () =>
+            liveStream.error instanceof Error
+                ? liveStream.error
+                : liveStream.error
+                  ? new Error(String(liveStream.error))
+                  : null,
+        [liveStream.error],
+    )
     const surfacedLiveStreamError = generationNotice && liveStreamError ? null : liveStreamError
     const mutationError =
         surfacedLiveStreamError ??
@@ -1057,7 +1060,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         warnings: [],
     })
 
-    const fallbackToStandardChatRequest = async (request: PendingLiveRequest) => {
+    const fallbackToStandardChatRequest = useEffectEvent(async (request: PendingLiveRequest) => {
         try {
             const response = await runChatRequest({
                 conversationId: request.conversationId,
@@ -1105,7 +1108,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
         } catch {
             rollbackPendingLiveRequest(request)
         }
-    }
+    })
 
     const runLiveChatRequest = async (payload: PendingLiveRequest & { history: Message[] }) => {
         // This deployment does not expose the thread hydration endpoints used by

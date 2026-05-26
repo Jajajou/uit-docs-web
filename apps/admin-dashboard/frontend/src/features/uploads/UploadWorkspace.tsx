@@ -57,10 +57,35 @@ const sourceHints: Record<UploadSourceType, { title: string; description: string
     },
 }
 
+const invalidFieldSelectors: Partial<Record<keyof UploadDraftFormValues, string>> = {
+    fileCount: '[data-upload-source-panel]',
+    rawText: 'textarea[name="rawText"]',
+    url: 'input[name="url"]',
+    title: 'input[name="title"]',
+    issuingUnit: 'input[name="issuingUnit"]',
+    visibilityScope: 'select[name="visibilityScope"]',
+    notes: 'textarea[name="notes"]',
+    confirmOwnership: 'input[name="confirmOwnership"]',
+    confirmReviewReady: 'input[name="confirmReviewReady"]',
+}
+
+function focusFirstInvalidUploadField(field: keyof UploadDraftFormValues) {
+    const selector = invalidFieldSelectors[field]
+    if (!selector || typeof document === 'undefined') {
+        return
+    }
+
+    window.requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>(selector)
+        target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        target?.focus({ preventScroll: true })
+    })
+}
+
 export function UploadWorkspace({ scenario }: { scenario?: string }) {
     const sessionQuery = useSessionQuery({ scenario })
     const [files, setFiles] = useState<File[]>([])
-    const [progressValue, setProgressValue] = useState(0)
+    const [uploadProgressValue, setUploadProgressValue] = useState(0)
     const {
         register,
         handleSubmit,
@@ -92,13 +117,13 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
 
     useEffect(() => {
         if (!isSubmitting) {
-            setProgressValue(latestSubmission ? 100 : 0)
+            setUploadProgressValue(latestSubmission ? 100 : 0)
             return
         }
 
-        setProgressValue((current) => (current > 6 ? current : 12))
+        setUploadProgressValue((current) => (current > 6 ? current : 12))
         const timer = window.setInterval(() => {
-            setProgressValue((current) => (current >= 92 ? current : current + 8))
+            setUploadProgressValue((current) => (current >= 92 ? current : current + 8))
         }, 220)
 
         return () => window.clearInterval(timer)
@@ -121,11 +146,18 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
         ],
         [confirmOwnership, confirmReviewReady, issuingUnit, sourceReady, title],
     )
+    const readinessPercent = Math.round((readinessScore / checklist.length) * 100)
+    const visibleProgressValue = isSubmitting || latestSubmission ? uploadProgressValue : readinessPercent
+    const progressLabel = isSubmitting
+        ? 'Đang gửi lên hàng duyệt...'
+        : latestSubmission
+          ? 'Đã tạo phiếu nộp'
+          : `${readinessScore}/${checklist.length} mục sẵn sàng`
 
     const resetDraft = () => {
         reset(defaultValues)
         setFiles([])
-        setProgressValue(0)
+        setUploadProgressValue(0)
     }
 
     const submitDraft = handleSubmit(async (values) => {
@@ -133,15 +165,22 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
         const result = validateUploadDraft(values)
 
         if (!result.success) {
+            let firstInvalidField: keyof UploadDraftFormValues | undefined
+
             for (const issue of result.error.issues) {
                 const field = issue.path[0]
 
                 if (typeof field === 'string') {
+                    firstInvalidField ??= field as keyof UploadDraftFormValues
                     setError(field as keyof UploadDraftFormValues, {
                         type: 'manual',
                         message: issue.message,
                     })
                 }
+            }
+
+            if (firstInvalidField) {
+                focusFirstInvalidUploadField(firstInvalidField)
             }
 
             return
@@ -226,6 +265,7 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                         <p className="text-sm text-gray-500">{currentSourceHint.description}</p>
                     </div>
 
+                    <div data-upload-source-panel tabIndex={-1} className="outline-none focus-visible:ring-4 focus-visible:ring-brand-500/12">
                     <Tabs
                         value={sourceType}
                         onValueChange={(value) => {
@@ -269,6 +309,7 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                             />
                         </TabsContent>
                     </Tabs>
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <Input
@@ -304,6 +345,7 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                     <div className="space-y-3 rounded-[1.5rem] border border-gray-200 bg-white/88 p-4 dark:border-gray-800 dark:bg-[#101a2c]">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white">Xác nhận trước khi gửi</div>
                         <Checkbox
+                            name="confirmOwnership"
                             label="Đây là nguồn chính thức của UIT hoặc đơn vị trực thuộc."
                             hint="Bắt buộc để tài liệu đi vào hàng duyệt."
                             checked={confirmOwnership}
@@ -315,6 +357,7 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                         {errors.confirmOwnership ? <p className="text-xs font-medium text-error-600">{errors.confirmOwnership.message}</p> : null}
 
                         <Checkbox
+                            name="confirmReviewReady"
                             label="Tài liệu đã sẵn sàng để admin rà soát."
                             hint="Tiêu đề, nguồn và đơn vị ban hành cần rõ ràng trước khi gửi."
                             checked={confirmReviewReady}
@@ -357,12 +400,12 @@ export function UploadWorkspace({ scenario }: { scenario?: string }) {
                         <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                             <div
                                 className="h-full rounded-full bg-brand-600 transition-all duration-300"
-                                style={{ width: `${progressValue}%` }}
+                                style={{ width: `${visibleProgressValue}%` }}
                             />
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-500">
-                            <span>{isSubmitting ? 'Đang gửi lên hàng duyệt...' : latestSubmission ? 'Đã tạo phiếu nộp' : currentSourceHint.title}</span>
-                            <span>{progressValue}%</span>
+                            <span>{progressLabel}</span>
+                            <span>{visibleProgressValue}%</span>
                         </div>
                     </div>
 

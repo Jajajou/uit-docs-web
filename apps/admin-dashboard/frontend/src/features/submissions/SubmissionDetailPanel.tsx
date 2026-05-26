@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { FileStack, GitPullRequest, Sparkles } from 'lucide-react'
 import { getLifecycleTone, getProcessingTone, getVisibilityTone, formatStatusLabel } from '@/entities/documents/presentation'
 import { useDocumentDetailQuery } from '@/entities/documents/queries'
+import { useSessionStore } from '@/entities/auth/store'
 import { useReviewTasksQuery } from '@/entities/reviews/queries'
 import { useSubmissionDetailQuery } from '@/entities/submissions/queries'
 import type { ReviewTask } from '@/entities/reviews/types'
@@ -37,8 +38,10 @@ function getMetadataDiffSummary(task?: ReviewTask) {
 }
 
 export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?: string }) {
+    const selectedRole = useSessionStore((state) => state.selectedRole)
+    const canLoadReviewerData = selectedRole === 'admin'
     const submissionQuery = useSubmissionDetailQuery(id, { scenario })
-    const reviewTasksQuery = useReviewTasksQuery({ scenario })
+    const reviewTasksQuery = useReviewTasksQuery({ scenario, enabled: canLoadReviewerData })
     const linkedDocumentQuery = useDocumentDetailQuery(submissionQuery.data?.linkedDocumentId ?? '', {
         scenario,
     })
@@ -156,9 +159,11 @@ export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?:
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                        <Button asChild variant="secondary">
-                            <Link to="/portal/review">Open review queue</Link>
-                        </Button>
+                        {canLoadReviewerData ? (
+                            <Button asChild variant="secondary">
+                                <Link to="/portal/review">Open review queue</Link>
+                            </Button>
+                        ) : null}
                         {submission.linkedDocumentId ? (
                             <Button asChild>
                                 <Link to={`/documents/${submission.linkedDocumentId}`}>Open published document</Link>
@@ -230,10 +235,12 @@ export function SubmissionDetailPanel({ id, scenario }: { id: string; scenario?:
                     <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
                         <div>
                             <span className="font-semibold text-gray-900 dark:text-white">Review task:</span>{' '}
-                            {submission.traceability?.reviewTaskId ? (
+                            {submission.traceability?.reviewTaskId && canLoadReviewerData ? (
                                 <Link className="text-brand-700 hover:text-brand-800 dark:text-brand-300" to="/portal/review">
                                     {submission.traceability.reviewTaskId}
                                 </Link>
+                            ) : submission.traceability?.reviewTaskId ? (
+                                submission.traceability.reviewTaskId
                             ) : (
                                 'Not linked'
                             )}

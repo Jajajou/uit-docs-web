@@ -24,6 +24,7 @@ interface DataTableProps<TData> {
     columns: DataTableColumn<TData>[]
     isLoading?: boolean
     getRowKey?: (row: TData, index: number) => string
+    mobileCardRender?: (row: TData) => ReactNode
     emptyIcon: LucideIcon
     emptyTitle: string
     emptyDescription: string
@@ -34,6 +35,7 @@ export function DataTable<TData>({
     columns,
     isLoading,
     getRowKey,
+    mobileCardRender,
     emptyIcon,
     emptyTitle,
     emptyDescription,
@@ -54,7 +56,17 @@ export function DataTable<TData>({
 
     return (
         <Card className="relative z-0 overflow-visible p-0">
-            <div className="overflow-x-auto rounded-[inherit]">
+            {mobileCardRender ? (
+                <div className="space-y-3 p-3 md:hidden">
+                    {rows.map((row, index) => (
+                        <div key={getRowKey ? getRowKey(row, index) : String(index)}>
+                            {mobileCardRender(row)}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            <div className={mobileCardRender ? 'hidden overflow-x-auto rounded-[inherit] md:block' : 'overflow-x-auto rounded-[inherit]'}>
                 <Table>
                     <TableHead>
                         <TableRow>

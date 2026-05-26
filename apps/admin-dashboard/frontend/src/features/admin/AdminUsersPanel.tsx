@@ -249,6 +249,55 @@ export function AdminUsersPanel({ scenario }: { scenario?: string }) {
                 emptyIcon={Users}
                 emptyTitle="Không có người dùng phù hợp"
                 emptyDescription="Thử nới bộ lọc hoặc xóa từ khóa tìm kiếm."
+                mobileCardRender={(user) => (
+                    <article className="space-y-4 rounded-[1.5rem] border border-gray-200 bg-white/88 p-4 shadow-theme-xs dark:border-white/10 dark:bg-white/[0.04]">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 space-y-1">
+                                <div className="truncate text-sm font-semibold text-gray-950 dark:text-white">{user.name}</div>
+                                <div className="break-all text-xs text-gray-500 dark:text-slate-400">{user.email}</div>
+                            </div>
+                            <Badge tone={getComplianceTone(user.isInternalDomainCompliant)}>
+                                {user.isInternalDomainCompliant ? 'Hợp lệ' : 'Cần rà soát'}
+                            </Badge>
+                        </div>
+
+                        <div className="grid gap-2 text-sm">
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-gray-500 dark:text-slate-400">Quyền truy cập</span>
+                                <Badge tone={getAdminRoleTone(user.role)}>{roleLabels[user.role]}</Badge>
+                            </div>
+                            <div className="text-xs leading-5 text-gray-500 dark:text-slate-400">{workspaceLabels[user.role]}</div>
+                            <div className="text-xs leading-5 text-gray-500 dark:text-slate-400">Hoạt động cuối {formatDateTime(user.lastActiveAt)}</div>
+                        </div>
+
+                        <div className="grid gap-3">
+                            <Select
+                                aria-label={`Đổi role cho ${user.name}`}
+                                className="dark:border-brand-400/14 dark:bg-[linear-gradient(180deg,rgba(8,18,31,0.94),rgba(11,24,42,0.98))]"
+                                options={editableRoleOptions}
+                                value={drafts[user.id]?.role ?? user.role}
+                                onChange={(event) => updateDraft(user.id, 'role', event.target.value as Role)}
+                            />
+                            <Select
+                                aria-label={`Đổi trạng thái cho ${user.name}`}
+                                className="dark:border-brand-400/14 dark:bg-[linear-gradient(180deg,rgba(8,18,31,0.94),rgba(11,24,42,0.98))]"
+                                options={editableStatusOptions}
+                                value={drafts[user.id]?.status ?? user.status}
+                                onChange={(event) => updateDraft(user.id, 'status', event.target.value as AdminUserStatus)}
+                            />
+                        </div>
+
+                        <Button
+                            className="min-h-11 w-full"
+                            variant={isDraftDirty(user, drafts[user.id]) ? 'primary' : 'secondary'}
+                            disabled={!isDraftDirty(user, drafts[user.id])}
+                            isLoading={adminUserPatchMutation.isPending}
+                            onClick={() => void handleSave(user)}
+                        >
+                            Lưu thay đổi
+                        </Button>
+                    </article>
+                )}
                 columns={[
                     {
                         key: 'identity',

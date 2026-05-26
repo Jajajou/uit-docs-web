@@ -2,10 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { applyReviewDecision, getReviewTasks } from '@/entities/reviews/api'
 import type { ReviewDecisionMutationPayload, ReviewTask } from '@/entities/reviews/types'
 
-export function useReviewTasksQuery(params?: { scenario?: string }) {
+export function useReviewTasksQuery(params?: { scenario?: string; enabled?: boolean }) {
+    const scenarioKey = params?.scenario ?? 'happy'
+
     return useQuery({
-        queryKey: ['reviews', params?.scenario ?? 'happy'],
-        queryFn: () => getReviewTasks(params),
+        queryKey: ['reviews', scenarioKey],
+        queryFn: () => getReviewTasks({ scenario: params?.scenario }),
+        enabled: params?.enabled ?? true,
     })
 }
 

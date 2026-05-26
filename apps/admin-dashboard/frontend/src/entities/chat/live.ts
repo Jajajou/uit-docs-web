@@ -2,7 +2,7 @@ import { FetchStreamTransport } from '@langchain/langgraph-sdk/react'
 import type { Message, PersistLiveChatRequest } from '@/entities/chat/types'
 
 const DEFAULT_LANGGRAPH_API_URL = '/api/langgraph'
-const DEFAULT_LANGGRAPH_ASSISTANT_ID = 'retrieval'
+const DEFAULT_LANGGRAPH_ASSISTANT_ID = '5bbc8364-e383-5087-8a2f-b6d27677f7a1'
 const LANGGRAPH_ROOT_RESOURCE_PATHS = ['/assistants', '/runs', '/store', '/threads']
 
 type LangGraphMessageType = 'human' | 'ai' | 'system'
