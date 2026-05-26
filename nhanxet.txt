@@ -1,0 +1,101 @@
+1. Overall Impression (2–3 sentences)
+When a normal student lands on the UIT Portal, the first impression is that they have entered an internal administrative dashboard, not a friendly AI assistant. The interface feels dense, technical, and slightly intimidating — filled with status badges, pending-review warnings, extraction confidence metrics, and approval timelines that have nothing to do with a student simply asking “Học phí kỳ 2 năm nay bao nhiêu?”. Compared to Grok.com or ChatGPT in 2026, this feels outdated and enterprise-heavy — more like a 2022 internal tool than a premium AI product students would actually enjoy using.
+2. Strengths (list 6–8 bullet points)
+
+Clear separation of the three main workflows (Chat, Upload, Manager) in the top navigation.
+The Conversation Index on the left provides a useful history of past student questions with quick visual indicators (alerts, references, warnings).
+The central chat area correctly displays user/assistant messages with timestamps and inline “Confidence 72%” badge.
+References and Warnings are explicitly surfaced (good for transparency in a university RAG system).
+Upload workspace has a clean drag-and-drop zone and helpful guidelines for lecturers.
+Workspace Manager cards are well-organized with clear status icons (green check, blue “C”, red “X”) and timestamps.
+The system already attempts to show citations and source metadata, which is essential for a university AI.
+Role-based top-right “Admin” dropdown indicates proper permission awareness.
+
+3. Major Weaknesses & Pain Points
+Layout & Visual Hierarchy
+
+The chat page is heavily fragmented: left sidebar + massive central transcript + dense right sidebar creates three competing columns with no clear focal point.
+Chat area feels squeezed and secondary instead of being the hero of the page.
+
+Information Overload & Redundancy
+
+Too many boxes, labels, counters (“MESSAGES 2”, “REFERENCED SOURCES 1”, “WARNINGS 1”), and metadata panels compete for attention.
+Repetitive information (e.g., the same reference appears in “Reference stack”, “Conversation transcript”, and warning banner).
+
+Public vs Internal Information Exposure
+
+Critical flaw: internal admin details are leaking into the public-facing chat (Latest answer health, Warning contract, low_confidence banner, “Public chat should always surface uncertainty…”).
+Students see “Pending review”, “Tài liệu nguồn đang ở trạng thái pending review”, and “Approval timeline” — information that should never reach end users.
+
+Chat Experience
+
+The “Conversation transcript” section looks like a debug log rather than a natural conversation.
+“Mock message” box at the bottom is clearly for developers/testers and should never be visible to students.
+No modern chat input feel — the input area is small and buried.
+
+Typography, Spacing & Modern Aesthetics
+
+Heavy use of small, tight text and multiple gray/blue/yellow alert boxes creates visual fatigue.
+Lack of generous whitespace and breathing room typical of 2026 AI interfaces.
+
+Admin/Workflow Elements that leak into public view
+
+Entire right sidebar (Latest answer health, Reference stack, Warning contract) and Upload/Manager tabs are visible and feel completely out of place for students.
+
+Mobile responsiveness (if inferable)
+
+Three-column layout will almost certainly collapse badly on mobile; no indication of responsive design.
+
+4. Information That Is Redundant for a Normal Student User
+The following elements should be completely hidden from regular students:
+
+“Public answer layer”, “Avg confidence 72%”
+Right sidebar: “Latest answer health”, “Confidence 72%”, “1 warnings”, “1 references”
+“Reference stack” + full document cards (“Thong bao hoc phi hoc ky 2”, “Pending review”)
+“Warning contract” box + “low_confidence” banner + explanatory text about “Public chat should always surface uncertainty…”
+“Conversation transcript” timestamps and full internal metadata
+“Tài liệu nguồn đang ở trạng thái pending review” yellow banner
+All “Draft readiness 0/5”, “Approval timeline”, “Temporal extraction”, “Extraction confidence”, “Human approval”, “Visibility release”, “Latest extraction result”, “DOCUMENT TYPE: other”, “INDEXED AT: Pending”, etc.
+“Mock message” section and “Send mock message” button
+Any mention of “Lecturer intake”, “Internal account rule”, “Editorial metadata”
+
+5. Comparison with Grok.com Style (2026 standard)
+The current UIT Portal is very far from Grok.com’s clean 2026 aesthetic. Grok.com uses:
+
+Single focused chat area that occupies ~80% of the screen
+Minimal left sidebar (history only)
+Almost zero persistent right sidebar
+Generous whitespace, large typography, soft shadows, and modern rounded input bar
+Citations appear as clean superscript numbers or small inline pills that expand on click
+No visible internal confidence metrics or “pending review” warnings unless explicitly requested
+
+UIT Portal currently feels like a backend admin panel that accidentally has a chat box in the middle, while Grok.com feels like a premium AI companion.
+6. Quick-Win Improvements (Top 8 recommendations)
+
+Hide the entire right sidebar on the public Chat page (move to admin-only toggle).
+Remove “Public answer layer”, “Avg confidence”, and all warning banners from student view.
+Replace “Conversation transcript” with a clean, modern chat thread (remove timestamps unless requested).
+Make the chat input box much larger, centered, and Grok-style (with suggestion chips above it).
+Move Upload and Manager tabs into a separate “Staff Portal” section accessible only after role-based login.
+Replace yellow/red alert boxes with subtle, non-intrusive indicators only when truly necessary.
+Increase whitespace dramatically around the chat area.
+Add a prominent “New chat” button at the top of the left sidebar and make conversation cards cleaner.
+
+7. Recommended New Layout Structure
+Ideal Chat page (main public-facing page):
+
+Top navigation: UIT Portal logo | Chat (active) | Knowledge Base | My Documents (optional) | [Staff Portal – visible only to lecturers/admins]
+Left sidebar (collapsible):
+New chat button
+Search conversations
+Clean list of past threads with title + date only
+
+Main area (70–75% of screen):
+Clean chat thread (user on right, assistant on left, Grok-style bubbles)
+Assistant messages include small superscript citation numbers
+At the bottom of each assistant reply: subtle “View sources” button (opens a clean drawer)
+
+Bottom input bar: Large, modern, full-width with attachment icon and voice input (optional)
+Right side: Nothing by default. Only a temporary drawer that slides in when user clicks “View sources” or “Details” (showing references + confidence only if student wants to see it).
+
+This layout keeps the university’s need for citations and source transparency while making the experience feel like a premium 2026 AI product that students will actually love using.

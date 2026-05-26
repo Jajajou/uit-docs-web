@@ -1,0 +1,10 @@
+.git
+.storybook
+coverage
+e2e
+node_modules
+test-results
+tmp
+tmp-vercel-preview
+*.log
+playwright*.ts

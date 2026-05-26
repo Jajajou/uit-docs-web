@@ -1,0 +1,5 @@
+# Development dependencies for admin-dashboard backend.
+# All entries MUST be pinned with an exact `==` so the lockfile-pin guard
+# (scripts/ci/check_requirements_pinned.sh) succeeds in CI (Requirements 19.3, 19.5).
+hypothesis==6.112.1
+respx==0.22.0

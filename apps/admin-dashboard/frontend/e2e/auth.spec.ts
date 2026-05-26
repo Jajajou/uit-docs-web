@@ -1,20 +1,17 @@
 import { expect, test } from '@playwright/test'
+import { loginAsRole } from './helpers'
 
-test('login bootstrap resolves lecturer into the contributor portal', async ({ page }) => {
+test('login page keeps Google-only auth visible', async ({ page }) => {
     await page.goto('/auth/login')
 
-    await expect(page.getByRole('heading', { name: 'Session bootstrap' })).toBeVisible()
-    await page.getByRole('button', { name: 'Continue as lecturer' }).click()
-
-    await expect(page).toHaveURL(/\/portal$/)
-    await expect(page.getByRole('heading', { name: 'Portal overview', level: 1 })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Tiếp tục với Google/i })).toBeVisible()
+    await expect(page.getByText(/Chỉ chấp nhận tài khoản Google chính thức được cấp bởi trường UIT/i)).toBeVisible()
 })
 
-test('login bootstrap resolves admin into the admin shell', async ({ page }) => {
-    await page.goto('/auth/login')
+test('mock bootstrap routes teacher and admin into the correct workspace', async ({ page }) => {
+    await loginAsRole(page, 'teacher', '/upload')
+    await expect(page.getByLabel(/Tiêu đề tài liệu/i)).toBeVisible()
 
-    await page.getByRole('button', { name: 'Continue as admin' }).click()
-
-    await expect(page).toHaveURL(/\/admin\/users$/)
-    await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible()
+    await loginAsRole(page, 'admin', '/manager')
+    await expect(page.getByPlaceholder(/Tìm theo tên hoặc email/i)).toBeVisible()
 })

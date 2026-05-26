@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from api.dependencies import ApiContext, get_api_context, get_workspace_service
-from api.schemas import ChatResponseDto, ChatStreamRequest, ConversationsResponse
+from api.schemas import ChatLiveSyncRequest, ChatResponseDto, ChatStreamRequest, ConversationsResponse
 from api.services.workspace_service import InMemoryWorkspaceService
 
 router = APIRouter()
@@ -16,7 +16,14 @@ async def list_sessions(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    return {"conversations": service.list_conversations(context.scenario, context.role)}
+    return {
+        "conversations": service.list_conversations(
+            context.scenario,
+            context.role,
+            context.session,
+            context.session_token,
+        )
+    }
 
 
 @router.post("/stream", response_model=ChatResponseDto)
@@ -25,19 +32,44 @@ async def stream_chat(
     context: ApiContext = Depends(get_api_context),
     service: InMemoryWorkspaceService = Depends(get_workspace_service),
 ) -> dict:
-    # Use workspace service but ensure it doesn't fail with 502 due to live chat settings
-    try:
-        return service.send_chat_message(payload.model_dump(), context.scenario, context.role)
-    except Exception:
-        return {
-            "conversation_id": payload.conversationId or "mock-conv",
-            "message": {
-                "id": "mock-msg",
-                "role": "assistant",
-                "content": "Phản hồi đang được xử lý qua luồng LangGraph mới.",
-                "created_at": "2024-05-04T00:00:00Z",
-                "confidence": 1.0,
-                "references": [],
-                "warnings": []
-            }
-        }
+    return service.send_chat_message(
+        payload.model_dump(),
+        context.scenario,
+        context.role,
+        context.session,
+        context.session_token,
+    )
+
+
+@router.post("/live-sync", response_model=ChatResponseDto)
+async def sync_live_chat(
+    payload: ChatLiveSyncRequest,
+    context: ApiContext = Depends(get_api_context),
+    service: InMemoryWorkspaceService = Depends(get_workspace_service),
+) -> dict:
+    return service.persist_live_chat_message(
+        payload.model_dump(),
+        context.scenario,
+        context.role,
+        context.session,
+        context.session_token,
+    )
+
+
+@router.delete("/sessions/{conversation_id}", status_code=204)
+async def delete_session(
+    conversation_id: str,
+    context: ApiContext = Depends(get_api_context),
+    service: InMemoryWorkspaceService = Depends(get_workspace_service),
+) -> Response:
+    service.delete_conversation(conversation_id, context.role, context.session, context.session_token)
+    return Response(status_code=204)
+
+
+@router.delete("/sessions", status_code=204)
+async def clear_sessions(
+    context: ApiContext = Depends(get_api_context),
+    service: InMemoryWorkspaceService = Depends(get_workspace_service),
+) -> Response:
+    service.clear_conversations(context.role, context.session, context.session_token)
+    return Response(status_code=204)

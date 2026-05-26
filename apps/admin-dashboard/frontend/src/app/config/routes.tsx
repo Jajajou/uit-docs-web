@@ -30,6 +30,8 @@ export const INTERNAL_EMAIL_DOMAIN = '@gm.uit.edu.vn'
 export const routeMeta: AppRouteMeta[] = [
     { path: '/', title: 'Chat', shell: 'app', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
     { path: '/chat', title: 'Chat', shell: 'app', allowedRoles: allRoles, navLabel: 'Chat', icon: Bot },
+    { path: '/documents', title: 'Tài liệu', shell: 'app', allowedRoles: allRoles, navLabel: 'Tài liệu', icon: FileSearch },
+    { path: '/library', title: 'Tài liệu', shell: 'app', allowedRoles: allRoles },
     { path: '/knowledge', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles },
     { path: '/documents/:id', title: 'Chi tiết tài liệu', shell: 'app', allowedRoles: allRoles, navLabel: 'Tài liệu', icon: FileSearch },
     { path: '/upload', title: 'Tải lên', shell: 'app', allowedRoles: portalContributorRoles, navLabel: 'Tải lên', icon: Upload },

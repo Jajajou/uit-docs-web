@@ -4,8 +4,13 @@ import { normalizeApiError } from '@/shared/api/error'
 import { mockApiAdapter } from '@/shared/api/mockAdapter'
 import { isMockAdapterEnabled } from '@/shared/api/mockRuntime'
 
+function getApiBaseUrl() {
+    const configuredBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? '').trim()
+    return configuredBaseUrl || '/api'
+}
+
 export const apiClient = axios.create({
-    baseURL: '/api',
+    baseURL: getApiBaseUrl(),
     timeout: 10000,
     withCredentials: true,
     adapter: isMockAdapterEnabled ? mockApiAdapter : undefined,

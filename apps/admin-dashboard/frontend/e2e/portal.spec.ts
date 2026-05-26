@@ -1,36 +1,27 @@
 import { expect, test } from '@playwright/test'
-import { setStoredRole } from './helpers'
+import { loginAsRole, setStoredRole } from './helpers'
 
-test('lecturer can submit a text upload draft', async ({ page }) => {
-    await setStoredRole(page, 'lecturer')
-    await page.goto('/portal/upload')
+test('teacher can submit a text upload draft', async ({ page }) => {
+    await loginAsRole(page, 'teacher', '/upload')
 
-    await expect(page.getByRole('heading', { name: 'Upload workspace' })).toBeVisible()
-    await page.getByRole('tab', { name: 'Text' }).click()
-    await page.getByLabel('Submission title').fill('Thong bao hoc phi he dao tao chat luong cao')
-    await page.getByLabel('Issuing unit').fill('Phong Dao tao Dai hoc')
+    await page.getByRole('tab', { name: /Văn bản/i }).click()
+    await page.getByRole('textbox', { name: /^Tiêu đề tài liệu$/i }).fill('Thông báo học phí hệ đào tạo chất lượng cao')
+    await page.getByRole('textbox', { name: /^Đơn vị ban hành$/i }).fill('Phòng Đào tạo Đại học')
     await page
-        .getByLabel('Raw bulletin text')
-        .fill('Thong bao hoc phi he dao tao chat luong cao co hieu luc tu hoc ky he nam 2026 va da du thong tin de he thong trich xuat.')
-    await page.getByRole('checkbox', { name: 'I confirm this source comes from an official UIT or faculty channel.' }).check()
-    await page.getByRole('checkbox', { name: 'I understand the document enters a human review queue before it becomes trusted.' }).check()
-    await page.getByRole('button', { name: 'Submit for review' }).click()
+        .getByRole('textbox', { name: /^Nội dung văn bản$/i })
+        .fill('Thông báo học phí hệ đào tạo chất lượng cao có hiệu lực từ học kỳ hè năm 2026 và đã đủ thông tin để hệ thống trích xuất.')
+    await page.getByRole('checkbox', { name: /Đây là nguồn chính thức/i }).check()
+    await page.getByRole('checkbox', { name: /Tài liệu đã sẵn sàng để admin rà soát/i }).check()
+    await page.getByRole('button', { name: /Gửi tài liệu/i }).click()
 
-    await expect(page.getByText('uploading')).toBeVisible()
-    await expect(page.getByText('announcement', { exact: false })).toBeVisible()
+    await expect(page.getByText(/Đã tạo phiếu nộp/i).first()).toBeVisible()
+    await expect(page.getByText(/Thông báo học phí hệ đào tạo chất lượng cao/i)).toBeVisible()
 })
 
-test('operator can open review queue and retry a failed job', async ({ page }) => {
-    await setStoredRole(page, 'operator')
-    await page.goto('/portal/review')
+test('teacher cannot access manager shell', async ({ page }) => {
+    await setStoredRole(page, 'teacher')
+    await page.goto('/manager')
 
-    await expect(page.getByRole('heading', { name: 'Review queue', level: 1 })).toBeVisible()
-    await expect(page.getByText('Reviewer decision workspace')).toBeVisible()
-    await page.getByRole('link', { name: 'Open submission detail' }).click()
-    await expect(page.getByRole('heading', { name: 'Submission detail', level: 1 })).toBeVisible()
-
-    await page.goto('/portal/jobs?scenario=failed-job')
-    await expect(page.getByRole('heading', { name: 'Jobs monitor' })).toBeVisible()
-    await page.getByRole('button', { name: 'Retry' }).click()
-    await expect(page.getByText('Retry accepted for')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+    await expect(page.getByText(/Attempted route: \/manager/i)).toBeVisible()
 })

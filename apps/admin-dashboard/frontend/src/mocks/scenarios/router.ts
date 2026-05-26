@@ -23,6 +23,8 @@ import { reviewFixtures } from '@/mocks/fixtures/reviews'
 import { submissionFixtures } from '@/mocks/fixtures/submissions'
 import type { MockHttpError, MockHttpResponse, MockRequestDescriptor, MockScenario } from '@/mocks/scenarios/types'
 
+type MockConversationRecord = ConversationDto & { owner_key?: string }
+
 interface MockWorkspaceState {
     documents: DocumentDto[]
     submissions: SubmissionDto[]
@@ -32,7 +34,7 @@ interface MockWorkspaceState {
     rolePolicies: RolePolicyDto[]
     systemSettings: SystemSettingDto[]
     auditLogs: AuditLogEntryDto[]
-    conversations: ConversationDto[]
+    conversations: MockConversationRecord[]
 }
 
 const INTERNAL_EMAIL_DOMAIN = '@gm.uit.edu.vn'
@@ -94,6 +96,15 @@ function createError(error: MockHttpError, requestId: string): never {
 function getRoleFromHeaders(headers: Record<string, string> | undefined): Role {
     const role = headers?.['x-demo-role']
     return isRole(role) ? role : 'student'
+}
+
+function getConversationOwnerKey(request: MockRequestDescriptor) {
+    return `role:${getRoleFromHeaders(request.headers)}`
+}
+
+function toConversationDto(conversation: MockConversationRecord): ConversationDto {
+    const { owner_key: _ownerKey, ...payload } = conversation
+    return payload
 }
 
 function getRoleFromPayload(value: unknown): Role | null {
@@ -1001,19 +1012,72 @@ function resolveAuditLogs(request: MockRequestDescriptor): MockHttpResponse {
 }
 
 function resolveConversations(request: MockRequestDescriptor): MockHttpResponse {
+    const ownerKey = getConversationOwnerKey(request)
     return {
         status: 200,
         data: {
-            conversations: getScenario(request) === 'empty' ? [] : clone(getHappyState().conversations),
+            conversations:
+                getScenario(request) === 'empty'
+                    ? []
+                    : clone(
+                        getHappyState()
+                            .conversations.filter((conversation) => conversation.owner_key === ownerKey)
+                            .map(toConversationDto),
+                    ),
         },
     }
 }
 
+function resolveDeleteConversation(request: MockRequestDescriptor): MockHttpResponse {
+    const segments = request.pathname.split('/')
+    const conversationId = segments[segments.length - 1]
+    const ownerKey = getConversationOwnerKey(request)
+
+    if (!conversationId) {
+        createError(
+            {
+                code: 'conversation_not_found',
+                message: 'Conversation not found.',
+                status: 404,
+            },
+            request.requestId,
+        )
+    }
+
+    const state = getHappyState()
+    const nextConversations = state.conversations.filter(
+        (conversation) => !(conversation.id === conversationId && conversation.owner_key === ownerKey),
+    )
+    if (nextConversations.length === state.conversations.length) {
+        createError(
+            {
+                code: 'conversation_not_found',
+                message: 'Conversation not found.',
+                status: 404,
+            },
+            request.requestId,
+        )
+    }
+
+    state.conversations = nextConversations
+    return { status: 204, data: undefined }
+}
+
+function resolveClearConversationsForOwner(request: MockRequestDescriptor): MockHttpResponse {
+    const ownerKey = getConversationOwnerKey(request)
+    getHappyState().conversations = getHappyState().conversations.filter((conversation) => conversation.owner_key !== ownerKey)
+    return { status: 204, data: undefined }
+}
+
 function resolveChatResponse(request: MockRequestDescriptor): MockHttpResponse<ChatResponseDto> {
     const scenario = getScenario(request)
+    const ownerKey = getConversationOwnerKey(request)
     const payload = typeof request.data === 'object' && request.data !== null ? request.data as Record<string, unknown> : {}
     const question = typeof payload.message === 'string' ? payload.message : 'Can you clarify the request?'
-    const conversationId = typeof payload.conversationId === 'string' ? payload.conversationId : 'conv-001'
+    const conversationId =
+        typeof payload.conversationId === 'string' && payload.conversationId.trim()
+            ? payload.conversationId
+            : `conv-${request.requestId.slice(0, 8)}`
 
     if (scenario === 'error') {
         createError(
@@ -1055,7 +1119,18 @@ function resolveChatResponse(request: MockRequestDescriptor): MockHttpResponse<C
                 : [],
     }
 
-    const conversation = getHappyState().conversations.find((entry) => entry.id === conversationId)
+    const state = getHappyState()
+    let conversation = state.conversations.find((entry) => entry.id === conversationId)
+    if (conversation && conversation.owner_key !== ownerKey) {
+        createError(
+            {
+                code: 'conversation_not_found',
+                message: 'Conversation not found.',
+                status: 404,
+            },
+            request.requestId,
+        )
+    }
     if (conversation) {
         conversation.messages.push({
             id: `msg-user-${request.requestId.slice(0, 8)}`,
@@ -1067,6 +1142,25 @@ function resolveChatResponse(request: MockRequestDescriptor): MockHttpResponse<C
         })
         conversation.messages.push(clone(reply))
         conversation.updated_at = reply.created_at
+    } else {
+        conversation = {
+            id: conversationId,
+            owner_key: ownerKey,
+            title: question.slice(0, 64) || 'Cuoc tro chuyen moi',
+            updated_at: reply.created_at,
+            messages: [
+                {
+                    id: `msg-user-${request.requestId.slice(0, 8)}`,
+                    role: 'user',
+                    content: question,
+                    created_at: currentIsoTime(),
+                    references: [],
+                    warnings: [],
+                },
+                clone(reply),
+            ],
+        }
+        state.conversations.unshift(conversation)
     }
 
     return {
@@ -1104,6 +1198,8 @@ export async function resolveMockRequest(request: MockRequestDescriptor): Promis
     if (method === 'patch' && /^\/admin\/settings\/[^/]+$/.test(request.pathname)) return resolvePatchSystemSetting(request)
     if (method === 'get' && request.pathname === '/admin/audit-logs') return resolveAuditLogs(request)
     if (method === 'get' && request.pathname === '/chat/sessions') return resolveConversations(request)
+    if (method === 'delete' && request.pathname === '/chat/sessions') return resolveClearConversationsForOwner(request)
+    if (method === 'delete' && /^\/chat\/sessions\/[^/]+$/.test(request.pathname)) return resolveDeleteConversation(request)
     if (method === 'post' && request.pathname === '/chat/stream') return resolveChatResponse(request)
 
     createError(

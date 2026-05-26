@@ -37,8 +37,17 @@ class Settings:
     LIGHTRAG_PUBLIC_USERNAME: str = os.getenv("LIGHTRAG_PUBLIC_USERNAME", os.getenv("LIGHTRAG_USERNAME", "admin"))
     LIGHTRAG_PUBLIC_PASSWORD: str = os.getenv("LIGHTRAG_PUBLIC_PASSWORD", os.getenv("LIGHTRAG_PASSWORD", "admin"))
 
-    # LangGraph service
-    LANGGRAPH_URL: str = os.getenv("LANGGRAPH_URL", "http://localhost:2024")
+    # LangGraph query pipeline
+    LANGGRAPH_URL: str = os.getenv("LANGGRAPH_URL", "http://localhost:2024").strip().rstrip("/")
+    LANGGRAPH_API_KEY: str = os.getenv("LANGGRAPH_API_KEY", "").strip()
+    LANGGRAPH_TIMEOUT_SECONDS: int = int(os.getenv("LANGGRAPH_TIMEOUT_SECONDS", "180"))
+    LANGGRAPH_INTERNAL_ASSISTANT_ID: str = os.getenv(
+        "LANGGRAPH_INTERNAL_ASSISTANT_ID",
+        os.getenv("RETRIEVAL_ASSISTANT_ID", "5bbc8364-e383-5087-8a2f-b6d27677f7a1"),
+    ).strip()
+    LANGGRAPH_PUBLIC_URL: str = os.getenv("LANGGRAPH_PUBLIC_URL", "").strip().rstrip("/")
+    LANGGRAPH_PUBLIC_API_KEY: str = os.getenv("LANGGRAPH_PUBLIC_API_KEY", os.getenv("LANGGRAPH_API_KEY", "")).strip()
+    LANGGRAPH_PUBLIC_ASSISTANT_ID: str = os.getenv("LANGGRAPH_PUBLIC_ASSISTANT_ID", "").strip()
 
     # File Upload
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", str(Path(__file__).parent.parent / "uploads"))
@@ -62,6 +71,7 @@ class Settings:
         "CORS_ORIGINS",
         "http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:5173,http://localhost:5173",
     )
+    CORS_ORIGIN_REGEX: str = os.getenv("CORS_ORIGIN_REGEX", "").strip()
     TRUSTED_HOSTS: list = env_csv("TRUSTED_HOSTS", "")
     FORCE_HTTPS_REDIRECT: bool = env_flag("FORCE_HTTPS_REDIRECT", "false")
 

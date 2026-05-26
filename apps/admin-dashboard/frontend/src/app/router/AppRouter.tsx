@@ -7,6 +7,7 @@ import {
     loadAppLayout,
     loadAuthLayout,
     loadChatPage,
+    loadLibraryPage,
     loadDocumentDetailPage,
     loadLoginPage,
     loadAuthCallbackPage,
@@ -20,6 +21,7 @@ const AppLayout = lazy(loadAppLayout)
 const AuthLayout = lazy(loadAuthLayout)
 
 const ChatPage = lazy(loadChatPage)
+const LibraryPage = lazy(loadLibraryPage)
 const DocumentDetailPage = lazy(loadDocumentDetailPage)
 
 const LoginPage = lazy(loadLoginPage)
@@ -38,6 +40,8 @@ export default function AppRouter() {
                 <Route element={<AppLayout />}>
                     <Route path="/" element={<ChatPage />} />
                     <Route path="/chat" element={<ChatPage />} />
+                    <Route path="/documents" element={<LibraryPage />} />
+                    <Route path="/library" element={<LibraryPage />} />
                     <Route path="/documents/:id" element={<DocumentDetailPage />} />
 
                     {/* Guarded App Routes */}

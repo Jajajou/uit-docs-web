@@ -12,7 +12,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.sql import func
 
-from api.services.fixtures import build_initial_state
+from api.services.fixtures import build_initial_state, normalize_workspace_state
 
 
 class WorkspaceState(TypedDict):
@@ -73,6 +73,8 @@ class WorkspaceStateStore(Protocol):
     def update_system_setting_value(self, key: str, value: str) -> dict | None: ...
 
     def upsert_conversation(self, conversation: dict) -> dict: ...
+    def delete_conversation(self, conv_id: str) -> bool: ...
+    def clear_conversations(self) -> None: ...
 
     def dispose(self) -> None: ...
 
@@ -940,7 +942,7 @@ class SqlAlchemyWorkspaceStore:
         self._replace_ordered_rows(session, WorkspaceConversation, conversations, make_row)
 
     def save_state(self, state: WorkspaceState) -> WorkspaceState:
-        snapshot = deepcopy(state)
+        snapshot = normalize_workspace_state(deepcopy(state))
         with self.session_factory.begin() as session:
             self._replace_blob_payloads(session, snapshot)
             self._replace_session_templates(session, snapshot["sessions"])
@@ -1014,6 +1016,18 @@ class SqlAlchemyWorkspaceStore:
                 row.updated_at_iso = values["updated_at_iso"]
                 row.payload = values["payload"]
         return deepcopy(conversation)
+
+    def delete_conversation(self, conv_id: str) -> bool:
+        with self.session_factory.begin() as session:
+            row = session.get(WorkspaceConversation, conv_id)
+            if row is None:
+                return False
+            session.delete(row)
+        return True
+
+    def clear_conversations(self) -> None:
+        with self.session_factory.begin() as session:
+            session.execute(delete(WorkspaceConversation))
 
     def reset(self) -> WorkspaceState:
         seed = build_seed_state()

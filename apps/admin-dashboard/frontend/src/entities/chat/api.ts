@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/client'
-import { mapConversationDto, mapMessageDto } from '@/entities/chat/mappers'
-import type { ChatResponseDto, Conversation, ConversationDto, Message } from '@/entities/chat/types'
+import { mapChatResponseDto, mapConversationDto } from '@/entities/chat/mappers'
+import type { ChatResponse, ChatResponseDto, Conversation, ConversationDto, PersistLiveChatRequest } from '@/entities/chat/types'
 
 const CHAT_REQUEST_TIMEOUT_MS = 90000
 
@@ -13,13 +13,40 @@ export async function getConversations(params?: { scenario?: string }): Promise<
 }
 
 export async function sendChatMessage(
-    payload: { conversationId?: string; message: string },
+    payload: { conversationId?: string; message: string; signal?: AbortSignal },
     params?: { scenario?: string },
-): Promise<Message> {
-    const response = await apiClient.post<ChatResponseDto>('/chat/stream', payload, {
+): Promise<ChatResponse> {
+    const { signal, ...requestPayload } = payload
+
+    const response = await apiClient.post<ChatResponseDto>('/chat/stream', requestPayload, {
+        params,
+        timeout: CHAT_REQUEST_TIMEOUT_MS,
+        signal,
+    })
+
+    return mapChatResponseDto(response.data)
+}
+
+export async function persistLiveChatMessage(
+    payload: PersistLiveChatRequest,
+    params?: { scenario?: string },
+): Promise<ChatResponse> {
+    const response = await apiClient.post<ChatResponseDto>('/chat/live-sync', payload, {
         params,
         timeout: CHAT_REQUEST_TIMEOUT_MS,
     })
 
-    return mapMessageDto(response.data.message)
+    return mapChatResponseDto(response.data)
+}
+
+export async function deleteConversation(conversationId: string, params?: { scenario?: string }): Promise<void> {
+    await apiClient.delete(`/chat/sessions/${conversationId}`, {
+        params,
+    })
+}
+
+export async function clearConversations(params?: { scenario?: string }): Promise<void> {
+    await apiClient.delete('/chat/sessions', {
+        params,
+    })
 }

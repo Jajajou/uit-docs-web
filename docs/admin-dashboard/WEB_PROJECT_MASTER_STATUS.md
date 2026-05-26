@@ -16,7 +16,7 @@ Out of scope:
 
 Reference date:
 
-- `2026-03-24`
+- `2026-04-13`
 
 ## 2. Workspace structure
 
@@ -34,27 +34,34 @@ web/
       uxui_screen/
 ```
 
-## 3. Final architecture inside `/web`
+## 3. Current architecture inside `/web`
 
 ### 3.1 Frontend
 
 - one React app
-- three shells:
-  - `Public`
-  - `Portal`
-  - `Admin`
+- three user experiences:
+  - `student`
+  - `teacher`
+  - `admin`
+- three shell layouts:
+  - `app`
+  - `auth`
+  - `system`
 - role-driven route guards based on `Session.user.role`
 - shared DTO mappers, query hooks, and design-system primitives
 - lazy routes, manual chunking, route prefetch
 - axios mock adapter as the only active browser-side mock strategy
+- portal overview backed by `/api/analytics/*` through a dedicated frontend analytics entity layer
 
 ### 3.2 Backend
 
 - FastAPI BFF aligned to the frontend contract
-- in-memory workspace service for local tests and live `/web` regression
+- SqlAlchemy-backed normalized persistence (all 13 domains have dedicated tables, no blob state)
+- business/service layer still mutates in-memory state then persists via `_persist_state()`; repository refactor pending
 - normalized error envelope
 - cookie-backed auth session via `uit_web_session`
-- provider-ready SSO layer behind backend auth routers
+- Google OAuth external SSO flow code-complete (token exchange, userinfo, domain restriction); env-dependent activation
+- analytics endpoints available under `/api/analytics/*`
 
 ## 4. What has been completed
 
@@ -72,37 +79,41 @@ web/
 - design system foundation and Storybook
 - route guards, `403`, `404`, loading and error states
 - lazy loading and chunk splitting
+- UIT blue/white shell, light mode, dark mode, Google-only login UX
 
-### 4.2 Public features
+### 4.2 Student experience
 
-- home page
 - chat page
 - citation navigation to document detail
 - confidence and warning states
 - archived-citation handling
+- compact drawer-based chat UI for history and document sources
 
-### 4.3 Lecturer and operator flows
+### 4.3 Teacher experience
 
 - upload by file, text, and URL
 - upload validation and duplicate-upload handling
-- submissions list and submission detail
-- review queue
-- review decisions
-- library filters
-- jobs monitor and retry
-- document detail
-- archive and reindex actions
+- access to upload and document detail surfaces
 
-### 4.4 Admin features
+### 4.4 Admin experience
 
+- manager shell at `/manager`
 - users
 - roles matrix
 - settings
 - audit logs
-- explicit admin break-glass wording for operator-owned remediation flows
+- review queue
+- review decisions
+- jobs monitor and retry
+- library filters
+- archive and reindex actions
 
-### 4.5 Document lifecycle
+### 4.5 Analytics and document lifecycle
 
+- portal overview wired to:
+  - `/api/analytics/overview`
+  - `/api/analytics/pipeline`
+  - `/api/analytics/health`
 - version history
 - related activity history
 - audit deep links
@@ -120,12 +131,22 @@ web/
   - `GET /api/auth/sso/start`
   - `GET /api/auth/sso/callback`
   - `POST /api/auth/logout`
-- current live mode still uses a local `/web` provider emulator by default
-- backend is now provider-ready for a real institutional SSO handoff
+- Google OAuth external flow is code-complete:
+  - `sso_provider.py` has full `exchange_code_for_identity()` with token exchange and userinfo
+  - `auth.py` callback handles both emulator and external mode
+  - domain restriction to `@gm.uit.edu.vn` enforced
+- activation requires env vars: `SSO_PROVIDER_MODE=external`, `SSO_CLIENT_ID`, `SSO_CLIENT_SECRET`
+- default mode remains local emulator for development and testing
+
+### 4.7 Persistence and test foundation
+
+- all 13 workspace domains are normalized in SQLAlchemy tables
+- bare `pytest` now works with `testpaths` + expanded `norecursedirs`
+- frontend has coverage, Chromium e2e, WebKit mobile, live, a11y, and visual lanes in the toolchain
 
 ## 5. Current frontend routes
 
-### 5.1 Public
+### 5.1 App/public
 
 - `/`
 - `/chat`
@@ -136,22 +157,19 @@ web/
 - `/auth/login`
 - `/auth/callback`
 
-### 5.3 Portal
+### 5.3 Contributor
 
-- `/portal`
-- `/portal/upload`
-- `/portal/submissions`
-- `/portal/submissions/:id`
-- `/portal/review`
-- `/portal/library`
-- `/portal/jobs`
+- `/knowledge`
+- `/upload`
 
 ### 5.4 Admin
 
-- `/admin/users`
-- `/admin/roles`
-- `/admin/settings`
-- `/admin/audit-logs`
+- `/manager`
+
+### 5.5 System
+
+- `/403`
+- `*`
 
 ## 6. Current backend contract
 
@@ -188,6 +206,10 @@ web/
 - `GET /api/admin/settings`
 - `PATCH /api/admin/settings/{key}`
 - `GET /api/admin/audit-logs`
+- `GET /api/analytics/overview`
+- `GET /api/analytics/pipeline`
+- `GET /api/analytics/graph-stats`
+- `GET /api/analytics/health`
 
 ## 7. Quality status
 
@@ -197,81 +219,94 @@ Latest verified status:
 
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm run test`: PASS, `44` tests
-- `npm run test:e2e`: PASS, `12` tests
-- `npm run test:e2e:live`: PASS, `7` tests
+- `npm run test:coverage`: PASS, `88` tests
+- `npm run test:e2e`: PASS, `15` tests
+- `npm run test:e2e:webkit`: PASS, `2` tests
 - `npm run build`: PASS
 - `npm run build-storybook`: PASS on the last shared-UI pass
+- `npm run check:ci`: currently stops at `test:e2e:live` if local port `8001` is already occupied by another process; this is a local harness conflict, not a confirmed app regression
 
 ### 7.2 Backend
 
 Latest verified status:
 
-- `python -m ruff check .`: PASS
-- `python -m pytest`: PASS, `41` tests
+- `python -m pytest --tb=short`: PASS, `65` tests
 
 ## 8. Clean decisions already locked
 
 - frontend contract is the source of truth inside `/web`
 - internal email policy is `@gm.uit.edu.vn`
-- operator owns operational mutations
-- admin is governance + narrow audited break-glass override
+- role model is `guest | student | teacher | admin`
+- Google-only auth is the active UX contract
 - browser mock strategy is axios-adapter-only
+- analytics health UI must not expose raw `lightrag_url`
 - document lifecycle v2 is read-first only
 - restore and rollback actions are deferred
 
 ## 9. What still remains
 
-Only one major item remains:
+Three categories of work remain:
 
-- replace the local `/web` SSO emulator with the real institutional provider
+### 9.1 Service-layer architecture
 
-This is no longer an architecture task inside `/web`.
-It is now an integration activation task that depends on external inputs.
+- refactor `workspace_service.py` to use repository methods instead of direct list/dict mutation + `_persist_state()`
+- reduce dependence on full-snapshot persistence writes
+
+### 9.2 Production persistence and integration
+
+- migrate from SQLite to Postgres with Alembic migration scripts
+- wire `/web` upload flow to real LightRAG / Firecrawl ingestion if live mode is needed
+
+### 9.3 Activation and deploy hardening
+
+- activate the Google OAuth external flow by providing env vars (`SSO_CLIENT_ID`, `SSO_CLIENT_SECRET`, `SSO_CALLBACK_BASE_URL`)
+- finish production deploy with domains, secrets, canary smoke, and observability
 
 ## 10. External inputs required for the real SSO switch
 
 Needed from outside `/web`:
 
-1. `SSO_AUTHORIZE_URL`
-2. `SSO_CLIENT_ID`
+1. `SSO_CLIENT_ID`
+2. `SSO_CLIENT_SECRET`
 3. callback registration for `/api/auth/sso/callback`
-4. claim mapping for:
-   - email
-   - direct role hint if any
-   - groups / entitlements
+4. frontend/backend base URLs and allowed origins for the target environment
 
 ## 11. Files already prepared for the real SSO switch
 
-- config template:
+- config templates:
+  - `web/apps/admin-dashboard/backend/.env.example`
   - `web/apps/admin-dashboard/backend/.env.sso.example`
 - backend provider abstraction:
   - `web/apps/admin-dashboard/backend/api/services/sso_provider.py`
 - backend auth router:
   - `web/apps/admin-dashboard/backend/api/routers/auth.py`
+- deploy and release docs:
+  - `web/docs/admin-dashboard/DEPLOYMENT_RUNBOOK.md`
+  - `web/docs/admin-dashboard/RELEASE_SMOKE_CHECKLIST.md`
 
 ## 12. Next steps
 
 ### 12.1 Immediate next step
 
-Provide the real SSO values:
+Extract repository methods from `workspace_service.py` for:
 
-- authorize URL
-- client id
-- callback registration confirmation
-- group / claim mapping
+- documents
+- submissions
+- reviews
+- admin users
+- jobs
 
-### 12.2 After those values are available
+### 12.2 After that
 
-1. fill backend `.env`
-2. switch `SSO_PROVIDER_MODE=external`
-3. restart backend
-4. confirm `/auth/login` no longer reports local emulator mode
-5. rerun:
+1. reduce `_persist_state()` full-snapshot writes
+2. move sqlite persistence toward Postgres + Alembic
+3. wire live ingestion if `/web` must leave contract-only mode
+4. activate Google OAuth external mode in the target environment
+5. rerun isolated live regression:
    - `npm run test:e2e:live`
 6. manually verify:
-   - lecturer login
-   - operator login
+   - student login
+   - teacher login
    - admin login
    - non-compliant email denial
    - logout
@@ -280,9 +315,10 @@ Provide the real SSO values:
 
 `/web` is fully complete when:
 
-1. the real institutional provider replaces the local emulator
-2. `/api/auth/sso/start` redirects to the real provider
-3. `/api/auth/sso/callback` completes with the real provider
-4. `uit_web_session` is still issued correctly
-5. protected routes still resolve correctly by role
-6. live regression still passes
+1. repository methods replace direct service-layer list/dict mutation for the main workspace domains
+2. production persistence and migrations are in place
+3. `/web` upload and query flows are wired to the live AI/data pipeline if live mode is required
+4. Google OAuth external mode is activated in the target environment
+5. `uit_web_session` is still issued correctly
+6. protected routes still resolve correctly by role
+7. isolated live regression still passes

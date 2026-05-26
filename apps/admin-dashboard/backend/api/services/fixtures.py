@@ -3,6 +3,115 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Any
+
+MOJIBAKE_MARKERS = ("Ã", "Ä", "Æ", "á»", "áº", "â€", "â€™", "â€“", "â€”")
+
+EXACT_TEXT_REPLACEMENTS = {
+    "Nguyen Thi Student": "Nguyễn Thị Student",
+    "Guest User": "Người dùng khách",
+    "Le Thi Operator": "Lê Thị Operator",
+    "Pham Van Lecturer": "Phạm Văn Lecturer",
+    "Tran Van Admin": "Trần Văn Admin",
+    "Phong Dao tao": "Phòng Đào tạo",
+    "Phong Dao tao Dai hoc": "Phòng Đào tạo Đại học",
+    "Phòng Đào tạo Dai hoc": "Phòng Đào tạo Đại học",
+    "Phong Cong tac Sinh vien": "Phòng Công tác Sinh viên",
+    "Quy trinh xin tam hoan hoc phi": "Quy trình xin tạm hoãn học phí",
+    "Thong bao hoc phi hoc ky 2": "Thông báo học phí học kỳ 2",
+    "Thong bao lich dang ky mon hoc": "Thông báo lịch đăng ký môn học",
+    "Thong bao hoc bong doanh nghiep": "Thông báo học bổng doanh nghiệp",
+    "Quy dinh hoc vu": "Quy định học vụ",
+    "Thu thap thong bao cong khai UIT": "Thu thập thông báo công khai UIT",
+    "Da duoc duyet tu phieu nop sub-002 va du dieu kien dung trong cau tra loi danh cho sinh vien.": "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong câu trả lời dành cho sinh viên.",
+    "Duoc duyet cho kenh chat sinh vien sau khi xac minh khoang thoi gian hieu luc.": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
+    "Detected valid range and academic year from section 1 and 2.": "Đã xác định phạm vi hiệu lực và năm học từ mục 1 và mục 2.",
+    "Found fee semester pattern but no explicit valid_until date.": "Đã phát hiện mẫu học phí theo học kỳ nhưng chưa có ngày hết hiệu lực rõ ràng.",
+    "No date found. Document kept as archived reference only.": "Không tìm thấy ngày cụ thể. Tài liệu được giữ lại như tài liệu lưu trữ để tra cứu.",
+    "Date ranges extracted from heading and bulletin footer.": "Khoảng thời gian được trích từ tiêu đề và chân thông báo.",
+    "Archived after new scholarship bulletin superseded it.": "Đã lưu trữ sau khi có thông báo học bổng mới thay thế.",
+    "Rejected because the uploaded source does not include an official bulletin body or issue number.": "Từ chối vì nguồn tải lên không có nội dung thông báo chính thức hoặc số hiệu văn bản.",
+    "Displayed in public assistant results.": "Được hiển thị trong kết quả trả lời công khai.",
+    "Clarified cohort coverage for 2024 intake.": "Làm rõ phạm vi áp dụng cho khóa tuyển sinh 2024.",
+    "Updated indexed provenance after operator review.": "Cập nhật nguồn gốc chỉ mục sau khi điều phối viên rà soát.",
+    "Initial upload snapshot before operator confirmation.": "Bản chụp ban đầu của lần tải lên trước khi điều phối viên xác nhận.",
+    "Initial lecturer snapshot before operator confirmation.": "Bản chụp ban đầu do giảng viên cung cấp trước khi điều phối viên xác nhận.",
+    "Approved revision with clarified cohort range and indexing provenance.": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và nguồn gốc chỉ mục.",
+    "Approved revision with clarified cohort range and updated indexing provenance.": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và cập nhật nguồn gốc chỉ mục.",
+    "Reviewed publication dates and enrollment timeline from the official source page.": "Đã rà soát ngày công bố và mốc thời gian đăng ký từ trang nguồn chính thức.",
+    "Approved from submission sub-002 and now eligible for student-facing assistant answers.": "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong câu trả lời dành cho sinh viên.",
+    "Approved for public student-facing chat after date range verification.": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
+    "Published after review approval from submission sub-002.": "Được công bố sau khi duyệt phiếu nộp sub-002.",
+    "Expanded cohort coverage to include 2026.": "Mở rộng phạm vi khóa áp dụng để bao gồm năm 2026.",
+    "Confirmed publishable validity window through 2026-04-05.": "Xác nhận khoảng hiệu lực có thể công bố đến ngày 2026-04-05.",
+    "Preserved as historical reference and later archived.": "Được giữ lại làm tư liệu lịch sử và lưu trữ về sau.",
+    "Original scholarship notice preserved as historical reference.": "Thông báo học bổng gốc được lưu làm tư liệu lịch sử.",
+    "Archived notice kept for historical scholarship lookups.": "Thông báo lưu trữ vẫn được giữ để tra cứu học bổng trước đây.",
+    "Upload completed successfully.": "Tải lên hoàn tất thành công.",
+    "Embedding step failed. Retry available.": "Bước tạo embedding thất bại. Có thể thử lại.",
+    "Scanning source pages and scheduling updates.": "Đang quét các trang nguồn và lên lịch cập nhật.",
+    "Submission accepted by the /web BFF and queued for extraction.": "Phiếu nộp đã được tiếp nhận và đưa vào hàng chờ trích xuất.",
+    "Frontend-aligned ingestion contract generated a provisional temporal preview.": "Bản xem trước thời gian hiệu lực được tạo tạm thời từ hợp đồng ingest của frontend.",
+}
+
+DOCUMENT_INDEX_EXCERPTS = {
+    "doc-001": (
+        "Quy định học vụ năm học 2024-2025 áp dụng cho sinh viên các khóa 2022, 2023 và 2024. "
+        "Văn bản quy định điều kiện đăng ký học phần, cảnh báo học vụ, tạm dừng học và cách xử lý kết quả học tập theo từng học kỳ. "
+        "Hiệu lực từ ngày 01/09/2024 đến hết ngày 31/08/2025."
+    ),
+    "doc-002": (
+        "Thông báo học phí học kỳ 2 dành cho năm học 2025-2026. "
+        "Tài liệu nêu nguyên tắc thu học phí theo tín chỉ, mốc nộp học phí và yêu cầu rà soát trước khi công khai cho sinh viên."
+    ),
+    "doc-003": (
+        "Thông báo học bổng doanh nghiệp là tài liệu lưu trữ về các suất học bổng do doanh nghiệp tài trợ. "
+        "Văn bản được giữ lại để tra cứu lịch sử và không còn là nguồn áp dụng mới nhất."
+    ),
+    "doc-004": (
+        "Thông báo lịch đăng ký môn học áp dụng trực tiếp cho sinh viên khóa tuyển sinh 2024, 2025 và 2026. "
+        "Thời gian đăng ký từ ngày 20/03/2026 đến ngày 05/04/2026. "
+        "Sinh viên cần kiểm tra điều kiện tiên quyết, kế hoạch học tập và học phí trước khi xác nhận đăng ký."
+    ),
+}
+
+
+def repair_vietnamese_text(value: str) -> str:
+    text = str(value)
+    for _ in range(2):
+        if not any(marker in text for marker in MOJIBAKE_MARKERS):
+            break
+        try:
+            candidate = text.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            break
+        if candidate == text:
+            break
+        text = candidate
+    for source, target in EXACT_TEXT_REPLACEMENTS.items():
+        text = text.replace(source, target)
+    return " ".join(text.split())
+
+
+def _normalize_payload_text(value: Any) -> Any:
+    if isinstance(value, str):
+        return repair_vietnamese_text(value)
+    if isinstance(value, list):
+        return [_normalize_payload_text(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _normalize_payload_text(item) for key, item in value.items()}
+    return value
+
+
+def get_document_index_excerpt(document_id: str) -> str | None:
+    excerpt = DOCUMENT_INDEX_EXCERPTS.get(document_id)
+    if excerpt is None:
+        return None
+    return repair_vietnamese_text(excerpt)
+
+
+def normalize_workspace_state(state: dict[str, Any]) -> dict[str, Any]:
+    return _normalize_payload_text(deepcopy(state))
 
 INTERNAL_EMAIL_DOMAIN = "@gm.uit.edu.vn"
 ROLE_ROUTE_MATRIX = {
@@ -77,10 +186,10 @@ SESSION_FIXTURES = {
         "status": "authenticated",
         "user": {
             "id": "user-teacher",
-            "name": "Pham Van Lecturer",
+            "name": "Phạm Văn Lecturer",
             "email": "lecturer@gm.uit.edu.vn",
             "role": "teacher",
-            "department": "Faculty of Computer Science",
+            "department": "Khoa Khoa học Máy tính",
             "avatar_initials": "PL",
         },
     },
@@ -89,10 +198,10 @@ SESSION_FIXTURES = {
         "status": "authenticated",
         "user": {
             "id": "user-admin",
-            "name": "Tran Van Admin",
+            "name": "Trần Văn Admin",
             "email": "admin@gm.uit.edu.vn",
             "role": "admin",
-            "department": "System Administration",
+            "department": "Quản trị hệ thống",
             "avatar_initials": "TA",
         },
     },
@@ -101,8 +210,8 @@ SESSION_FIXTURES = {
 DOCUMENT_FIXTURES = [
     {
         "id": "doc-001",
-        "title": "Quy dinh hoc vu 2024-2025",
-        "owner_name": "Pham Van Lecturer",
+        "title": "Quy định học vụ 2024-2025",
+        "owner_name": "Phạm Văn Lecturer",
         "owner_email": "lecturer@gm.uit.edu.vn",
         "lifecycle_status": "approved",
         "processing_status": "completed",
@@ -128,56 +237,56 @@ DOCUMENT_FIXTURES = [
             "version_number": 2,
         },
         "supplemental_metadata": {
-            "title": "Quy dinh hoc vu 2024-2025",
-            "issuing_unit": "Phong Dao tao Dai hoc",
+            "title": "Quy định học vụ 2024-2025",
+            "issuing_unit": "Phòng Đào tạo Đại học",
             "tags": ["hoc-vu", "quy-che"],
             "visibility_scope": "public",
-            "notes": "Displayed in public assistant results.",
+            "notes": "Được hiển thị trong kết quả trả lời công khai.",
         },
         "traceability": {
             "source_submission_id": None,
             "source_review_id": None,
-            "reviewed_by_name": "Le Thi Operator",
+            "reviewed_by_name": "Lê Thị Operator",
             "published_at": "2026-03-16T08:31:00.000Z",
-            "publication_reason": "Approved revision with clarified cohort range and indexing provenance.",
+            "publication_reason": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và nguồn gốc chỉ mục.",
         },
         "version_history": [
             {
                 "id": "doc-001-v2",
                 "version_number": 2,
                 "created_at": "2026-03-16T08:31:00.000Z",
-                "created_by_name": "Le Thi Operator",
-                "change_summary": "Approved revision with clarified cohort range and updated indexing provenance.",
+                "created_by_name": "Lê Thị Operator",
+                "change_summary": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và cập nhật nguồn gốc chỉ mục.",
                 "file_source": "/uploads/quy-dinh-hoc-vu-2024-2025.pdf",
                 "content_hash": "4c3a430ec55b4f7509b8d7fc1b03017aa0f84ca4a690d8f0f0c26ee23c0f4aab",
                 "is_current": True,
                 "source_submission_id": None,
                 "source_review_id": None,
                 "change_highlights": [
-                    "Clarified cohort coverage for 2024 intake.",
-                    "Updated indexed provenance after operator review.",
+                    "Làm rõ phạm vi khóa tuyển sinh năm 2024.",
+                    "Cập nhật nguồn gốc chỉ mục sau khi quản trị viên rà soát.",
                 ],
             },
             {
                 "id": "doc-001-v1",
                 "version_number": 1,
                 "created_at": "2026-03-15T08:05:00.000Z",
-                "created_by_name": "Pham Van Lecturer",
-                "change_summary": "Initial upload snapshot before operator confirmation.",
+                "created_by_name": "Phạm Văn Lecturer",
+                "change_summary": "Bản chụp tải lên ban đầu trước khi quản trị viên xác nhận.",
                 "file_source": "/uploads/quy-dinh-hoc-vu-2024-2025-v1.pdf",
                 "content_hash": "29d9b0f5b6fd38df9065f6ee4b4f15d9d4da045e7c1a5327f1ea9f7eafe83382",
                 "is_current": False,
                 "source_submission_id": None,
                 "source_review_id": None,
-                "change_highlights": ["Initial lecturer snapshot before operator confirmation."],
+                "change_highlights": ["Bản chụp tải lên ban đầu trước khi quản trị viên xác nhận."],
             },
         ],
         "activity_history": [],
     },
     {
         "id": "doc-002",
-        "title": "Thong bao hoc phi hoc ky 2",
-        "owner_name": "Le Thi Operator",
+        "title": "Thông báo học phí học kỳ 2",
+        "owner_name": "Lê Thị Operator",
         "owner_email": "operator@gm.uit.edu.vn",
         "lifecycle_status": "pending_review",
         "processing_status": "extracting",
@@ -203,11 +312,11 @@ DOCUMENT_FIXTURES = [
             "version_number": 1,
         },
         "supplemental_metadata": {
-            "title": "Thong bao hoc phi hoc ky 2",
-            "issuing_unit": "Phong Ke hoach - Tai chinh",
+            "title": "Thông báo học phí học kỳ 2",
+            "issuing_unit": "Phòng Kế hoạch - Tài chính",
             "tags": ["hoc-phi"],
             "visibility_scope": "internal",
-            "notes": "Pending operator review before publish.",
+            "notes": "Đang chờ quản trị viên rà soát trước khi công khai.",
         },
         "traceability": {
             "source_submission_id": None,
@@ -221,33 +330,33 @@ DOCUMENT_FIXTURES = [
                 "id": "doc-002-v1",
                 "version_number": 1,
                 "created_at": "2026-03-18T04:16:00.000Z",
-                "created_by_name": "Le Thi Operator",
-                "change_summary": "Initial extraction snapshot created from uploaded DOCX notice.",
+                "created_by_name": "Lê Thị Operator",
+                "change_summary": "Bản trích xuất ban đầu được tạo từ thông báo DOCX đã tải lên.",
                 "file_source": "/uploads/thong-bao-hoc-phi-hk2.docx",
                 "content_hash": "f73cbe50f57b31cb5db54432f11ce1af2b3f915d7f7068cd1942e84551fdd201",
                 "is_current": True,
                 "source_submission_id": None,
                 "source_review_id": None,
-                "change_highlights": ["Initial extraction snapshot retained for internal review only."],
+                "change_highlights": ["Bản trích xuất ban đầu chỉ được giữ lại để rà soát nội bộ."],
             },
         ],
         "activity_history": [
             {
                 "id": "audit-004b",
-                "actor_name": "Le Thi Operator",
+                "actor_name": "Lê Thị Operator",
                 "actor_role": "admin",
                 "action": "reindex_document",
                 "target_type": "document",
                 "target_id": "doc-002",
-                "target_label": "Thong bao hoc phi hoc ky 2",
+                "target_label": "Thông báo học phí học kỳ 2",
                 "created_at": "2026-03-18T04:17:00.000Z",
             },
         ],
     },
     {
         "id": "doc-003",
-        "title": "Thong bao hoc bong doanh nghiep",
-        "owner_name": "Tran Van Admin",
+        "title": "Thông báo học bổng doanh nghiệp",
+        "owner_name": "Trần Văn Admin",
         "owner_email": "admin@gm.uit.edu.vn",
         "lifecycle_status": "archived",
         "processing_status": "completed",
@@ -273,8 +382,8 @@ DOCUMENT_FIXTURES = [
             "version_number": 1,
         },
         "supplemental_metadata": {
-            "title": "Thong bao hoc bong doanh nghiep",
-            "issuing_unit": "Phong Cong tac Sinh vien",
+            "title": "Thông báo học bổng doanh nghiệp",
+            "issuing_unit": "Phòng Công tác Sinh viên",
             "tags": ["hoc-bong"],
             "visibility_scope": "public",
             "notes": "Archived after new scholarship bulletin superseded it.",
@@ -282,42 +391,42 @@ DOCUMENT_FIXTURES = [
         "traceability": {
             "source_submission_id": None,
             "source_review_id": None,
-            "reviewed_by_name": "Tran Van Admin",
+            "reviewed_by_name": "Trần Văn Admin",
             "published_at": "2025-12-10T03:02:00.000Z",
-            "publication_reason": "Preserved as historical reference and later archived.",
+            "publication_reason": "Được giữ lại làm tư liệu lịch sử và lưu trữ sau đó.",
         },
         "version_history": [
             {
                 "id": "doc-003-v1",
                 "version_number": 1,
                 "created_at": "2025-12-10T03:02:00.000Z",
-                "created_by_name": "Tran Van Admin",
-                "change_summary": "Original scholarship notice preserved as historical reference.",
+                "created_by_name": "Trần Văn Admin",
+                "change_summary": "Thông báo học bổng gốc được lưu làm tư liệu lịch sử.",
                 "file_source": "/uploads/hoc-bong-doanh-nghiep.pdf",
                 "content_hash": "328e12c4cab9798b35fc4fd61ad1da4f3ffdb19b796d328bcb630374ac14f5ab",
                 "is_current": True,
                 "source_submission_id": None,
                 "source_review_id": None,
-                "change_highlights": ["Archived notice kept for historical scholarship lookups."],
+                "change_highlights": ["Thông báo lưu trữ vẫn được giữ để tra cứu học bổng trước đây."],
             },
         ],
         "activity_history": [
             {
                 "id": "audit-004",
-                "actor_name": "Tran Van Admin",
+                "actor_name": "Trần Văn Admin",
                 "actor_role": "admin",
                 "action": "archive_document",
                 "target_type": "document",
                 "target_id": "doc-003",
-                "target_label": "Thong bao hoc bong doanh nghiep",
+                "target_label": "Thông báo học bổng doanh nghiệp",
                 "created_at": "2026-02-01T09:20:00.000Z",
             },
         ],
     },
     {
         "id": "doc-004",
-        "title": "Thong bao lich dang ky mon hoc",
-        "owner_name": "Le Thi Operator",
+        "title": "Thông báo lịch đăng ký môn học",
+        "owner_name": "Lê Thị Operator",
         "owner_email": "operator@gm.uit.edu.vn",
         "lifecycle_status": "approved",
         "processing_status": "completed",
@@ -327,7 +436,7 @@ DOCUMENT_FIXTURES = [
             "document_type": "announcement",
             "extraction_method": "regex",
             "temporal_confidence": 0.9,
-            "temporal_reasoning": "Reviewed publication dates and enrollment timeline from the official source page.",
+            "temporal_reasoning": "Đã rà soát ngày công bố và mốc thời gian đăng ký từ trang nguồn chính thức.",
             "valid_from": "2026-03-20",
             "valid_until": "2026-04-05",
             "academic_year": "2025-2026",
@@ -343,66 +452,66 @@ DOCUMENT_FIXTURES = [
             "version_number": 1,
         },
         "supplemental_metadata": {
-            "title": "Thong bao lich dang ky mon hoc",
-            "issuing_unit": "Phong Dao tao Dai hoc",
+            "title": "Thông báo lịch đăng ký môn học",
+            "issuing_unit": "Phòng Đào tạo Đại học",
             "tags": ["dang-ky-mon-hoc", "thong-bao"],
             "visibility_scope": "public",
-            "notes": "Approved from submission sub-002 and now eligible for student-facing assistant answers.",
+            "notes": "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong câu trả lời dành cho sinh viên.",
         },
         "traceability": {
             "source_submission_id": "sub-002",
             "source_review_id": "review-002",
-            "reviewed_by_name": "Le Thi Operator",
+            "reviewed_by_name": "Lê Thị Operator",
             "published_at": "2026-03-17T05:33:00.000Z",
-            "publication_reason": "Approved for public student-facing chat after date range verification.",
+            "publication_reason": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
         },
         "version_history": [
             {
                 "id": "doc-004-v1",
                 "version_number": 1,
                 "created_at": "2026-03-17T05:33:00.000Z",
-                "created_by_name": "Le Thi Operator",
-                "change_summary": "Published after review approval from submission sub-002.",
+                "created_by_name": "Lê Thị Operator",
+                "change_summary": "Được công bố sau khi duyệt phiếu nộp sub-002.",
                 "file_source": "https://uit.edu.vn/dang-ky-mon-hoc",
                 "content_hash": "8c63c494a993d9347615387da779ce3c6b74ff78c08f9f941d190ced6a008fe1",
                 "is_current": True,
                 "source_submission_id": "sub-002",
                 "source_review_id": "review-002",
                 "change_highlights": [
-                    "Expanded cohort coverage to include 2026.",
-                    "Confirmed publishable validity window through 2026-04-05.",
+                    "Mở rộng phạm vi khóa áp dụng để bao gồm năm 2026.",
+                    "Xác nhận khoảng hiệu lực có thể công bố đến ngày 2026-04-05.",
                 ],
             },
         ],
         "activity_history": [
             {
                 "id": "audit-001",
-                "actor_name": "Pham Van Lecturer",
+                "actor_name": "Phạm Văn Lecturer",
                 "actor_role": "teacher",
                 "action": "upload_submission",
                 "target_type": "submission",
                 "target_id": "sub-002",
-                "target_label": "Thong bao lich dang ky mon hoc",
+                "target_label": "Thông báo lịch đăng ký môn học",
                 "created_at": "2026-03-17T05:05:00.000Z",
             },
             {
                 "id": "audit-002",
-                "actor_name": "Le Thi Operator",
+                "actor_name": "Lê Thị Operator",
                 "actor_role": "admin",
                 "action": "approve_review",
                 "target_type": "review",
                 "target_id": "review-002",
-                "target_label": "Thong bao lich dang ky mon hoc",
+                "target_label": "Thông báo lịch đăng ký môn học",
                 "created_at": "2026-03-17T05:31:00.000Z",
             },
             {
                 "id": "audit-003",
-                "actor_name": "Le Thi Operator",
+                "actor_name": "Lê Thị Operator",
                 "actor_role": "admin",
                 "action": "approve_review",
                 "target_type": "document",
                 "target_id": "doc-004",
-                "target_label": "Thong bao lich dang ky mon hoc",
+                "target_label": "Thông báo lịch đăng ký môn học",
                 "created_at": "2026-03-17T05:33:00.000Z",
             },
         ],
@@ -423,7 +532,7 @@ SUBMISSION_FIXTURES = [
             "document_type": "procedure",
             "extraction_method": "llm",
             "temporal_confidence": 0.81,
-            "temporal_reasoning": "Procedure title and section headers confirm document type.",
+            "temporal_reasoning": "Tiêu đề quy trình và các đề mục xác nhận loại tài liệu.",
             "valid_from": "2026-03-01",
             "valid_until": None,
             "academic_year": None,
@@ -440,22 +549,22 @@ SUBMISSION_FIXTURES = [
         },
         "supplemental_metadata": {
             "title": "Quy trinh xin tam hoan hoc phi",
-            "issuing_unit": "Phong Dao tao Dai hoc",
+            "issuing_unit": "Phòng Đào tạo Đại học",
             "tags": ["hoc-phi", "thu-tuc"],
             "visibility_scope": "internal",
-            "notes": "Uploaded by lecturer pending review.",
+            "notes": "Được giảng viên tải lên và đang chờ rà soát.",
         },
         "traceability": {
             "review_task_id": "review-001",
             "published_document_id": None,
-            "reviewed_by_name": "Le Thi Operator",
+            "reviewed_by_name": "Lê Thị Operator",
             "published_at": None,
-            "publication_reason": "Waiting for cohort confirmation before publication.",
+            "publication_reason": "Đang chờ xác nhận phạm vi khóa trước khi công bố.",
         },
     },
     {
         "id": "sub-002",
-        "title": "Thong bao lich dang ky mon hoc",
+        "title": "Thông báo lịch đăng ký môn học",
         "source_type": "url",
         "lifecycle_status": "approved",
         "processing_status": "completed",
@@ -482,18 +591,18 @@ SUBMISSION_FIXTURES = [
             "version_number": 1,
         },
         "supplemental_metadata": {
-            "title": "Thong bao lich dang ky mon hoc",
-            "issuing_unit": "Phong Dao tao Dai hoc",
+            "title": "Thông báo lịch đăng ký môn học",
+            "issuing_unit": "Phòng Đào tạo Đại học",
             "tags": ["dang-ky-mon-hoc"],
             "visibility_scope": "public",
-            "notes": "Published to student-facing chat.",
+            "notes": "Đã công bố cho kênh chat dành cho sinh viên.",
         },
         "traceability": {
             "review_task_id": "review-002",
             "published_document_id": "doc-004",
-            "reviewed_by_name": "Le Thi Operator",
+            "reviewed_by_name": "Lê Thị Operator",
             "published_at": "2026-03-17T05:33:00.000Z",
-            "publication_reason": "Approved for public student-facing chat after date range verification.",
+            "publication_reason": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
         },
     },
 ]
@@ -506,9 +615,9 @@ REVIEW_FIXTURES = [
         "title": "Quy trinh xin tam hoan hoc phi",
         "source_type": "file",
         "visibility_scope": "internal",
-        "submitted_by_name": "Pham Van Lecturer",
+        "submitted_by_name": "Phạm Văn Lecturer",
         "submitted_by_email": "lecturer@gm.uit.edu.vn",
-        "reviewer_name": "Le Thi Operator",
+        "reviewer_name": "Lê Thị Operator",
         "status": "pending_review",
         "confidence": 0.81,
         "created_at": "2026-03-19T02:10:00.000Z",
@@ -517,18 +626,18 @@ REVIEW_FIXTURES = [
             **deepcopy(SUBMISSION_FIXTURES[0]["temporal_metadata"]),
             "cohort_years": ["2023", "2024", "2025"],
         },
-        "reason": "Need confirmation on cohort range before publish.",
+        "reason": "Cần xác nhận lại phạm vi khóa trước khi công bố.",
     },
     {
         "id": "review-002",
         "submission_id": "sub-002",
         "published_document_id": "doc-004",
-        "title": "Thong bao lich dang ky mon hoc",
+        "title": "Thông báo lịch đăng ký môn học",
         "source_type": "url",
         "visibility_scope": "public",
-        "submitted_by_name": "Pham Van Lecturer",
+        "submitted_by_name": "Phạm Văn Lecturer",
         "submitted_by_email": "lecturer@gm.uit.edu.vn",
-        "reviewer_name": "Le Thi Operator",
+        "reviewer_name": "Lê Thị Operator",
         "status": "approved",
         "confidence": 0.88,
         "created_at": "2026-03-17T05:20:00.000Z",
@@ -537,18 +646,18 @@ REVIEW_FIXTURES = [
             **deepcopy(SUBMISSION_FIXTURES[1]["temporal_metadata"]),
             "cohort_years": ["2024", "2025", "2026"],
         },
-        "reason": "Approved for public student-facing chat after date range verification.",
+        "reason": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
     },
     {
         "id": "review-003",
         "submission_id": "sub-001",
         "published_document_id": None,
-        "title": "Thong bao hoc phi hoc ky 2",
+        "title": "Thông báo học phí học kỳ 2",
         "source_type": "file",
         "visibility_scope": "internal",
-        "submitted_by_name": "Pham Van Lecturer",
+        "submitted_by_name": "Phạm Văn Lecturer",
         "submitted_by_email": "lecturer@gm.uit.edu.vn",
-        "reviewer_name": "Le Thi Operator",
+        "reviewer_name": "Lê Thị Operator",
         "status": "rejected",
         "confidence": 0.42,
         "created_at": "2026-03-18T09:10:00.000Z",
@@ -586,7 +695,7 @@ JOB_FIXTURES = [
         "type": "upload",
         "status": "completed",
         "progress": 100,
-        "related_title": "Quy dinh hoc vu 2024-2025",
+            "related_title": "Quy định học vụ 2024-2025",
         "started_at": "2026-03-16T08:28:00.000Z",
         "updated_at": "2026-03-16T08:31:00.000Z",
         "message": "Upload completed successfully.",
@@ -606,7 +715,7 @@ JOB_FIXTURES = [
         "type": "scan",
         "status": "indexing",
         "progress": 48,
-        "related_title": "UIT public bulletin crawl",
+            "related_title": "Thu thập thông báo công khai UIT",
         "started_at": "2026-03-20T02:00:00.000Z",
         "updated_at": "2026-03-20T02:12:00.000Z",
         "message": "Scanning source pages and scheduling updates.",
@@ -616,7 +725,7 @@ JOB_FIXTURES = [
 ADMIN_USER_FIXTURES = [
     {
         "id": "usr-001",
-        "name": "Nguyen Minh Student",
+        "name": "Nguyễn Minh Student",
         "email": "student@uit.edu.vn",
         "role": "student",
         "status": "active",
@@ -626,7 +735,7 @@ ADMIN_USER_FIXTURES = [
     },
     {
         "id": "usr-002",
-        "name": "Pham Van Lecturer",
+        "name": "Phạm Văn Lecturer",
         "email": "lecturer@gm.uit.edu.vn",
         "role": "teacher",
         "status": "active",
@@ -636,7 +745,7 @@ ADMIN_USER_FIXTURES = [
     },
     {
         "id": "usr-003",
-        "name": "Le Thi Operator",
+        "name": "Lê Thị Operator",
         "email": "operator@gm.uit.edu.vn",
         "role": "admin",
         "status": "active",
@@ -646,7 +755,7 @@ ADMIN_USER_FIXTURES = [
     },
     {
         "id": "usr-004",
-        "name": "Tran Van Admin",
+        "name": "Trần Văn Admin",
         "email": "admin@gm.uit.edu.vn",
         "role": "admin",
         "status": "active",
@@ -666,7 +775,7 @@ ADMIN_USER_FIXTURES = [
     },
     {
         "id": "usr-005",
-        "name": "Invite Pending Lecturer",
+        "name": "Mời giảng viên đang chờ",
         "email": "pending-teacher@gm.uit.edu.vn",
         "role": "teacher",
         "status": "invited",
@@ -680,54 +789,54 @@ SYSTEM_SETTING_FIXTURES = [
     {
         "group": "auth",
         "key": "sso_provider",
-        "label": "Teacher SSO provider",
+        "label": "Nhà cung cấp SSO cho giảng viên",
         "value": "UIT Google Workspace SSO",
-        "description": "Internal staff accounts must authenticate via institutional SSO.",
+        "description": "Tài khoản nội bộ phải xác thực qua SSO chính thức của trường.",
         "is_sensitive": False,
         "source": "mock_policy",
     },
     {
         "group": "auth",
         "key": "internal_domain_rule",
-        "label": "Internal domain rule",
-        "value": "@gm.uit.edu.vn required for teacher/admin",
-        "description": "Contributor and admin roles are valid only with the institutional mail domain.",
+        "label": "Quy tắc domain nội bộ",
+        "value": "teacher/admin bắt buộc dùng @gm.uit.edu.vn",
+        "description": "Vai trò cộng tác viên và quản trị chỉ hợp lệ khi dùng email của trường.",
         "is_sensitive": False,
         "source": "derived_contract",
     },
     {
         "group": "ingestion",
         "key": "publication_gate",
-        "label": "Publication gate",
-        "value": "Review approval required before public release",
-        "description": "Teacher uploads remain provisional until an admin review approves them.",
+        "label": "Cổng công bố",
+        "value": "Phải được duyệt trước khi công khai",
+        "description": "Tài liệu do giảng viên tải lên chỉ là tạm thời cho đến khi quản trị viên duyệt.",
         "is_sensitive": False,
         "source": "derived_contract",
     },
     {
         "group": "publication",
         "key": "admin_break_glass_override",
-        "label": "Admin break-glass override",
-        "value": "Admin owns review, archive, reindex and retry actions with explicit audit trail",
-        "description": "Review, archive, reindex and retry actions are admin-owned and must remain auditable.",
+        "label": "Quyền can thiệp khẩn cấp của quản trị",
+        "value": "Quản trị viên sở hữu thao tác duyệt, lưu trữ, đánh chỉ mục lại và thử lại, kèm nhật ký đầy đủ",
+        "description": "Các thao tác duyệt, lưu trữ, đánh chỉ mục lại và thử lại phải do quản trị viên thực hiện và luôn được ghi nhận.",
         "is_sensitive": False,
         "source": "derived_contract",
     },
     {
         "group": "publication",
         "key": "system_api_key",
-        "label": "Backend ingestion secret",
+        "label": "Khóa bí mật cho luồng ingest backend",
         "value": "stored-in-secret-manager",
-        "description": "Credentials are managed server-side and never shown in frontend cleartext.",
+        "description": "Thông tin xác thực được quản lý ở phía server và không bao giờ hiển thị thô trên frontend.",
         "is_sensitive": True,
         "source": "mock_policy",
     },
     {
         "group": "chat",
         "key": "citation_policy",
-        "label": "Citation policy",
-        "value": "Student-facing answers must display references and warnings",
-        "description": "Low-confidence, pending-review or archived sources require explicit UI warnings.",
+        "label": "Chính sách trích dẫn",
+        "value": "Câu trả lời dành cho sinh viên phải hiển thị nguồn tham chiếu và cảnh báo",
+        "description": "Nguồn có độ tin cậy thấp, đang chờ duyệt hoặc đã lưu trữ phải hiển thị cảnh báo rõ ràng trên giao diện.",
         "is_sensitive": False,
         "source": "derived_contract",
     },
@@ -736,62 +845,62 @@ SYSTEM_SETTING_FIXTURES = [
 AUDIT_LOG_FIXTURES = [
     {
         "id": "audit-001",
-        "actor_name": "Pham Van Lecturer",
+        "actor_name": "Phạm Văn Lecturer",
         "actor_role": "teacher",
         "action": "upload_submission",
         "target_type": "submission",
         "target_id": "sub-002",
-        "target_label": "Thong bao lich dang ky mon hoc",
+        "target_label": "Thông báo lịch đăng ký môn học",
         "created_at": "2026-03-17T05:05:00.000Z",
     },
     {
         "id": "audit-002",
-        "actor_name": "Le Thi Operator",
+        "actor_name": "Lê Thị Operator",
         "actor_role": "admin",
         "action": "approve_review",
         "target_type": "review",
         "target_id": "review-002",
-        "target_label": "Thong bao lich dang ky mon hoc",
+        "target_label": "Thông báo lịch đăng ký môn học",
         "created_at": "2026-03-17T05:31:00.000Z",
     },
     {
         "id": "audit-003",
-        "actor_name": "Le Thi Operator",
+        "actor_name": "Lê Thị Operator",
         "actor_role": "admin",
         "action": "approve_review",
         "target_type": "document",
         "target_id": "doc-004",
-        "target_label": "Thong bao lich dang ky mon hoc",
+        "target_label": "Thông báo lịch đăng ký môn học",
         "created_at": "2026-03-17T05:33:00.000Z",
     },
     {
         "id": "audit-004",
-        "actor_name": "Tran Van Admin",
+        "actor_name": "Trần Văn Admin",
         "actor_role": "admin",
         "action": "archive_document",
         "target_type": "document",
         "target_id": "doc-003",
-        "target_label": "Thong bao hoc bong doanh nghiep",
+        "target_label": "Thông báo học bổng doanh nghiệp",
         "created_at": "2026-02-01T09:20:00.000Z",
     },
     {
         "id": "audit-004b",
-        "actor_name": "Le Thi Operator",
+        "actor_name": "Lê Thị Operator",
         "actor_role": "admin",
         "action": "reindex_document",
         "target_type": "document",
         "target_id": "doc-002",
-        "target_label": "Thong bao hoc phi hoc ky 2",
+        "target_label": "Thông báo học phí học kỳ 2",
         "created_at": "2026-03-18T04:17:00.000Z",
     },
     {
         "id": "audit-005",
-        "actor_name": "Tran Van Admin",
+        "actor_name": "Trần Văn Admin",
         "actor_role": "admin",
         "action": "role_switch",
         "target_type": "session",
         "target_id": "session-admin",
-        "target_label": "Demo role switch to admin",
+        "target_label": "Chuyển vai trò demo sang admin",
         "created_at": "2026-03-20T07:30:00.000Z",
     },
 ]
@@ -799,129 +908,32 @@ AUDIT_LOG_FIXTURES = [
 DENSE_AUDIT_LOG_FIXTURES = [
     {
         "id": "audit-000",
-        "actor_name": "Nguyen Minh Student",
+        "actor_name": "Nguyễn Minh Student",
         "actor_role": "student",
         "action": "login",
         "target_type": "session",
         "target_id": "session-student",
-        "target_label": "Student portal session",
+        "target_label": "Phiên cổng sinh viên",
         "created_at": "2026-03-20T06:15:00.000Z",
     },
     *deepcopy(AUDIT_LOG_FIXTURES),
     {
         "id": "audit-006",
-        "actor_name": "Le Thi Operator",
+        "actor_name": "Lê Thị Operator",
         "actor_role": "admin",
         "action": "reject_review",
         "target_type": "review",
         "target_id": "review-003",
-        "target_label": "Thong bao hoc phi hoc ky 2",
+        "target_label": "Thông báo học phí học kỳ 2",
         "created_at": "2026-03-18T16:15:00.000Z",
     },
 ]
 
-CONVERSATION_FIXTURES = [
-    {
-        "id": "conv-001",
-        "title": "Tra cuu hoc phi",
-        "updated_at": "2026-03-20T03:00:05.000Z",
-        "messages": [
-            {
-                "id": "msg-001",
-                "role": "user",
-                "content": "Hoc phi hoc ky 2 nam nay bao nhieu?",
-                "created_at": "2026-03-20T03:00:00.000Z",
-                "references": [],
-                "warnings": [],
-            },
-            {
-                "id": "msg-002",
-                "role": "assistant",
-                "content": "Hoc phi hien tai dang duoc tham chieu tu thong bao hoc phi hoc ky 2. Ban nen kiem tra lai theo khoa va so tin chi truoc khi nop.",
-                "created_at": "2026-03-20T03:00:05.000Z",
-                "confidence": 0.72,
-                "references": [
-                    {
-                        "id": "ref-001",
-                        "title": "Thong bao hoc phi hoc ky 2",
-                        "href": "/documents/doc-002",
-                        "excerpt": "Thong bao muc hoc phi theo so tin chi va thoi han thanh toan.",
-                        "status_label": "Pending review",
-                    }
-                ],
-                "warnings": [{"code": "low_confidence", "message": "Tai lieu nguon dang o trang thai pending review."}],
-            },
-        ],
-    },
-    {
-        "id": "conv-002",
-        "title": "Dieu kien hoc bong",
-        "updated_at": "2026-03-19T06:15:00.000Z",
-        "messages": [
-            {
-                "id": "msg-003",
-                "role": "user",
-                "content": "Dieu kien hoc bong doanh nghiep la gi?",
-                "created_at": "2026-03-19T06:14:00.000Z",
-                "references": [],
-                "warnings": [],
-            },
-            {
-                "id": "msg-004",
-                "role": "assistant",
-                "content": "Thong tin hoc bong cu da duoc luu tru. Ban nen lien he phong CTSV de nhan ban cap nhat moi nhat.",
-                "created_at": "2026-03-19T06:15:00.000Z",
-                "confidence": 0.41,
-                "references": [
-                    {
-                        "id": "ref-002",
-                        "title": "Thong bao hoc bong doanh nghiep",
-                        "href": "/documents/doc-003",
-                        "excerpt": "Thong bao cu da het hieu luc.",
-                        "status_label": "Archived",
-                    }
-                ],
-                "warnings": [{"code": "archived_source", "message": "Nguon tham chieu da duoc archive."}],
-            },
-        ],
-    },
-    {
-        "id": "conv-003",
-        "title": "Lich dang ky mon hoc",
-        "updated_at": "2026-03-20T07:30:00.000Z",
-        "messages": [
-            {
-                "id": "msg-005",
-                "role": "user",
-                "content": "Lich dang ky mon hoc cho khoa 2024 bat dau khi nao?",
-                "created_at": "2026-03-20T07:29:00.000Z",
-                "references": [],
-                "warnings": [],
-            },
-            {
-                "id": "msg-006",
-                "role": "assistant",
-                "content": "Theo thong bao da duoc duyet, lich dang ky mon hoc bat dau tu ngay 20/03/2026 va keo dai den 05/04/2026.",
-                "created_at": "2026-03-20T07:30:00.000Z",
-                "confidence": 0.9,
-                "references": [
-                    {
-                        "id": "ref-003",
-                        "title": "Thong bao lich dang ky mon hoc",
-                        "href": "/documents/doc-004",
-                        "excerpt": "Thong bao da duoc duyet va co the dung cho tra cuu sinh vien.",
-                        "status_label": "Approved",
-                    }
-                ],
-                "warnings": [],
-            },
-        ],
-    },
-]
+CONVERSATION_FIXTURES: list[dict] = []
 
 
 def build_initial_state() -> dict:
-    return {
+    return normalize_workspace_state({
         "sessions": deepcopy(SESSION_FIXTURES),
         "documents": deepcopy(DOCUMENT_FIXTURES),
         "submissions": deepcopy(SUBMISSION_FIXTURES),
@@ -941,4 +953,4 @@ def build_initial_state() -> dict:
         "audit_logs": deepcopy(AUDIT_LOG_FIXTURES),
         "dense_audit_logs": deepcopy(DENSE_AUDIT_LOG_FIXTURES),
         "conversations": deepcopy(CONVERSATION_FIXTURES),
-    }
+    })

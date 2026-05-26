@@ -62,3 +62,25 @@ export interface ChatResponseDto {
     conversation_id: string
     message: MessageDto
 }
+
+export interface ChatResponse {
+    conversationId: string
+    message: Message
+}
+
+export interface LiveChatResultPayload {
+    final_answer?: string
+    generated_response?: string
+    response_text?: string
+    response?: string
+    response_type?: string
+    references?: Array<Record<string, unknown>>
+    confidence_summary?: Record<string, unknown>
+    [key: string]: unknown
+}
+
+export interface PersistLiveChatRequest {
+    conversationId?: string
+    message: string
+    result: LiveChatResultPayload
+}

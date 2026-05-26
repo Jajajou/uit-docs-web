@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UIT Campus Desk Concept</title>
+    <style>
+      :root {
+        --bg: #f5f1e8;
+        --surface: rgba(255, 252, 247, 0.84);
+        --surface-strong: #fffdf8;
+        --ink: #112031;
+        --muted: #5e6b78;
+        --line: rgba(17, 32, 49, 0.12);
+        --brand: #005bbb;
+        --brand-deep: #0f3b75;
+        --accent: #f4b740;
+        --success: #1d7a43;
+        --warning: #a86512;
+        --radius-xl: 32px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
+        --shadow-lg: 0 28px 60px rgba(32, 44, 58, 0.12);
+        --shadow-sm: 0 8px 20px rgba(32, 44, 58, 0.08);
+        --max-width: 1320px;
+        --font-body: "Be Vietnam Pro", "Segoe UI", "Helvetica Neue", sans-serif;
+        --font-display: "Georgia", "Times New Roman", serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(0, 91, 187, 0.14), transparent 26%),
+          radial-gradient(circle at right 12% top 10%, rgba(244, 183, 64, 0.16), transparent 18%),
+          linear-gradient(180deg, #f8f5ed 0%, var(--bg) 100%);
+        font-family: var(--font-body);
+      }
+
+      body {
+        padding: 24px;
+      }
+
+      .shell {
+        max-width: var(--max-width);
+        margin: 0 auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 252, 247, 0.78);
+        backdrop-filter: blur(12px);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .brand-mark {
+        width: 50px;
+        height: 50px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        color: white;
+        background: linear-gradient(145deg, #0c61c6, #0f3b75);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+
+      .brand-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--brand);
+        font-weight: 700;
+      }
+
+      .brand-copy strong {
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .nav a {
+        padding: 12px 18px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-weight: 700;
+        border: 1px solid transparent;
+        text-decoration: none;
+      }
+
+      .nav a.is-active {
+        color: var(--brand-deep);
+        background: rgba(0, 91, 187, 0.1);
+        border-color: rgba(0, 91, 187, 0.14);
+      }
+
+      .nav a:hover {
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.56);
+      }
+
+      .hero {
+        margin-top: 22px;
+        display: grid;
+        grid-template-columns: 1.4fr 0.86fr;
+        gap: 20px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .panel,
+      .status-card,
+      .timeline-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+        box-shadow: var(--shadow-lg);
+      }
+
+      .hero-main {
+        position: relative;
+        overflow: hidden;
+        padding: 36px;
+      }
+
+      .hero-main::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 14% 12%, rgba(244, 183, 64, 0.18), transparent 26%),
+          radial-gradient(circle at 88% 18%, rgba(0, 91, 187, 0.2), transparent 28%);
+        pointer-events: none;
+      }
+
+      .hero-copy {
+        position: relative;
+        z-index: 1;
+        max-width: 760px;
+      }
+
+      .hero-copy h1 {
+        margin: 10px 0 16px;
+        font-family: var(--font-display);
+        font-size: clamp(40px, 6vw, 72px);
+        line-height: 0.95;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .hero-copy p {
+        margin: 0;
+        max-width: 60ch;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.7;
+      }
+
+      .hero-actions {
+        margin-top: 26px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 52px;
+        padding: 0 22px;
+        border-radius: 999px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        color: white;
+        background: linear-gradient(135deg, #0c61c6, #0f3b75);
+        box-shadow: 0 14px 28px rgba(0, 91, 187, 0.22);
+      }
+
+      .button.secondary {
+        color: var(--ink);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .hero-kpis {
+        position: relative;
+        z-index: 1;
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .status-card {
+        padding: 18px;
+      }
+
+      .status-card small {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 700;
+      }
+
+      .status-card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .hero-side {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .hero-side h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .task-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .task-card {
+        display: block;
+        padding: 18px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(17, 32, 49, 0.08);
+        background: var(--surface-strong);
+        text-decoration: none;
+      }
+
+      .task-card strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .task-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .task-card.is-hot {
+        border-color: rgba(244, 183, 64, 0.32);
+        background: linear-gradient(180deg, rgba(255, 247, 223, 0.95), rgba(255, 252, 247, 0.96));
+      }
+
+      .grid {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 20px;
+      }
+
+      .panel {
+        padding: 26px;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+      }
+
+      .panel-header h2,
+      .panel-header h3 {
+        margin: 0;
+      }
+
+      .panel-header p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .action-row {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .action-chip {
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--brand-deep);
+        background: rgba(0, 91, 187, 0.06);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .chat-preview {
+        margin-top: 22px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .message {
+        padding: 18px 20px;
+        border-radius: 22px;
+        line-height: 1.65;
+      }
+
+      .message.user {
+        margin-left: auto;
+        max-width: 80%;
+        background: #10253d;
+        color: white;
+      }
+
+      .message.assistant {
+        max-width: 92%;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid var(--line);
+      }
+
+      .message .caption {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(0, 91, 187, 0.08);
+        color: var(--brand-deep);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .references {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .rail-card {
+        display: block;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(244, 247, 252, 0.88);
+        border: 1px solid rgba(17, 32, 49, 0.08);
+        text-decoration: none;
+      }
+
+      .rail-card strong {
+        display: block;
+      }
+
+      .rail-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .rail-card .meta {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .badge.success {
+        color: var(--success);
+        background: rgba(29, 122, 67, 0.1);
+      }
+
+      .badge.warning {
+        color: var(--warning);
+        background: rgba(244, 183, 64, 0.18);
+      }
+
+      .two-up {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      .timeline {
+        margin-top: 16px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .timeline-card {
+        padding: 18px 20px;
+      }
+
+      .timeline-card strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .timeline-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .timeline-card small {
+        display: block;
+        margin-top: 10px;
+        color: var(--brand);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .footer-note {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      @media (max-width: 1080px) {
+        .hero,
+        .grid,
+        .two-up {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-copy h1 {
+          max-width: 12ch;
+        }
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding: 14px;
+        }
+
+        .topbar {
+          padding: 16px;
+          border-radius: 26px;
+        }
+
+        .brand-copy strong {
+          font-size: 20px;
+        }
+
+        .hero-main,
+        .hero-side,
+        .panel,
+        .status-card,
+        .timeline-card {
+          border-radius: 24px;
+        }
+
+        .hero-main,
+        .hero-side,
+        .panel {
+          padding: 20px;
+        }
+
+        .hero-kpis {
+          grid-template-columns: 1fr;
+        }
+
+        .message.user,
+        .message.assistant {
+          max-width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">UIT</div>
+          <div class="brand-copy">
+            <span class="eyebrow">Campus task desk</span>
+            <strong>UIT AI</strong>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <a class="is-active" href="#">Trang chu</a>
+          <a href="#">Hoi nhanh</a>
+          <a href="#">Tai lieu</a>
+          <a href="#">Tai len</a>
+          <a href="#">Quan tri</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-main">
+          <div class="hero-copy">
+            <span class="eyebrow">Sinh vien bat dau tu nhiem vu, khong bat dau tu transcript</span>
+            <h1>Mot cua so duy nhat de hoi, kiem chung va hanh dong.</h1>
+            <p>
+              Trang chu khong can la chat. Trang chu can giup sinh vien vao dung viec ngay: hoc phi, dang ky hoc phan,
+              hoc bong, hoc vu, chuong trinh dao tao, va tai lieu chinh thuc lien quan.
+            </p>
+
+            <div class="hero-actions">
+              <a class="button primary" href="#">Mo hoi nhanh</a>
+              <a class="button secondary" href="#">Xem thu vien tai lieu</a>
+            </div>
+
+            <div class="hero-kpis">
+              <div class="status-card">
+                <small>Tra loi co nguon</small>
+                <strong>2-3</strong>
+              </div>
+              <div class="status-card">
+                <small>Cap nhat moi</small>
+                <strong>12</strong>
+              </div>
+              <div class="status-card">
+                <small>Nhiem vu nong</small>
+                <strong>06</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="hero-side">
+          <div>
+            <h2>Bat dau theo tac vu</h2>
+            <p class="footer-note">Moi entry point duoc goi bang ngon ngu cua sinh vien, khong bang ten module he thong.</p>
+          </div>
+
+          <div class="task-list">
+            <a class="task-card is-hot" href="#">
+              <strong>Dang ky hoc phan</strong>
+              <span>Xem lich, quy dinh, moc thoi gian va cau hoi thuong gap.</span>
+            </a>
+            <a class="task-card" href="#">
+              <strong>Hoc phi va mien giam</strong>
+              <span>Tra nhanh cach tinh hoc phi, hoc phi con no va nhung giay to lien quan.</span>
+            </a>
+            <a class="task-card" href="#">
+              <strong>Hoc bong</strong>
+              <span>So sanh dieu kien, moc xet va tai lieu doi chieu chinh thuc.</span>
+            </a>
+            <a class="task-card" href="#">
+              <strong>Chuong trinh dao tao</strong>
+              <span>Di tu tom tat chuong trinh den van ban va mon hoc lien quan.</span>
+            </a>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Hoi nhanh, nhung luon quay ve nguon</h2>
+              <p>Chat la noi tong hop va dinh huong. Nguon chinh thuc van la trung tam cua niem tin.</p>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <a class="action-chip" href="#">Hoc phi hoc ky nay tinh the nao?</a>
+            <a class="action-chip" href="#">Bao gio mo dang ky hoc phan?</a>
+            <a class="action-chip" href="#">Dieu kien hoc bong la gi?</a>
+          </div>
+
+          <div class="chat-preview">
+            <div class="message user">
+              Em muon biet dot dang ky hoc phan sap toi co gi thay doi so voi hoc ky truoc?
+            </div>
+
+            <div class="message assistant">
+              <div class="caption">Ket luan nhanh</div>
+              Dot sap toi co thay doi o moc mo dang ky cho khoa 2024 va bo sung mot moc xu ly hoc vu sau dang ky.
+              Hay xem ngay 2 thong bao chinh thuc ben duoi de doi chieu lich va doi tuong ap dung.
+
+              <div class="references">
+                <a class="rail-card" href="#">
+                  <strong>Thong bao dang ky hoc phan hoc ky 1 nam hoc 2026-2027</strong>
+                  <span>Van ban chinh thuc tu phong dao tao. Co lich mo dang ky, doi tuong va ghi chu xu ly hoc vu.</span>
+                  <div class="meta">
+                    <span class="badge success">Con hieu luc</span>
+                    <span class="badge warning">Cap nhat 2 ngay truoc</span>
+                  </div>
+                </a>
+                <a class="rail-card" href="#">
+                  <strong>Huong dan xu ly hoc vu sau dang ky</strong>
+                  <span>Mo ta buoc chinh sua, bo sung ho so va nhung truong hop can lien he phong ban.</span>
+                  <div class="meta">
+                    <span class="badge success">Van ban noi bo</span>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Tai lieu dang duoc quan tam</h3>
+              <p>Thu vien phai duoc nhin thay ngay, khong bi an sau chat.</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="timeline-card">
+              <strong>Quy dinh ve to chuc thi tren may tinh</strong>
+              <span>Van ban chinh thuc, can tra cuu nhanh cho cac cau hoi hoc vu va kiem tra.</span>
+              <small>PDF · Hieu luc</small>
+            </div>
+            <div class="timeline-card">
+              <strong>Thong bao hoc bong hoc ky 2</strong>
+              <span>Tong hop doi tuong, dieu kien va lich nop ho so theo tung nhom hoc bong.</span>
+              <small>Thong bao · Moi cap nhat</small>
+            </div>
+            <div class="timeline-card">
+              <strong>CTDT khoa 2025</strong>
+              <span>Trang tong hop chuong trinh dao tao va cac tai lieu lien quan theo khoa.</span>
+              <small>CTDT · Trang tong hop</small>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="two-up">
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Dong cap nhat chinh thuc</h3>
+              <p>Thong bao moi, khong de nguoi dung phai tu doan xem co gi thay doi.</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="timeline-card">
+              <strong>Phong Dao tao cap nhat lich dang ky hoc phan</strong>
+              <span>Hoc ky toi dieu chinh 1 moc mo dang ky cho sinh vien khoa 2024.</span>
+              <small>Hom nay · DAA</small>
+            </div>
+            <div class="timeline-card">
+              <strong>Bo sung huong dan nop minh chung hoc bong</strong>
+              <span>Tai lieu moi them vao bo cau hoi hoc bong va thu vien minh chung.</span>
+              <small>Hom qua · CTSV</small>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Phan luong theo vai tro</h3>
+              <p>Nguoi dung thay tac vu dung voi ho, khong phai hoc cau truc he thong.</p>
+            </div>
+          </div>
+
+          <div class="timeline">
+            <div class="timeline-card">
+              <strong>Sinh vien</strong>
+              <span>Hoi nhanh, kiem chung, luu tai lieu can tham chieu, theo doi cap nhat.</span>
+            </div>
+            <div class="timeline-card">
+              <strong>Giang vien</strong>
+              <span>Tai len tai lieu noi bo va kiem tra cach no hien thi trong bo tra cuu.</span>
+            </div>
+            <div class="timeline-card">
+              <strong>Quan tri vien</strong>
+              <span>Kiem soat role, review queue, suc khoe ingest va audit trail.</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <p class="footer-note">
+        Concept nay khoa 3 quyet dinh: trang chu phai la task desk, chat la workspace rieng, va tai lieu chinh thuc
+        phai duoc dua len mat tien cua san pham.
+      </p>
+    </div>
+  </body>
+</html>

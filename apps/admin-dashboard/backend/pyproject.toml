@@ -9,8 +9,10 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "python-multipart>=0.0.12",
     "python-dotenv>=1.0.1",
+    "httpx>=0.27.0",
     "requests>=2.31.0",
     "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
     "aiofiles>=24.1.0",
     "sqlalchemy>=2.0.0",
 ]
@@ -24,7 +26,6 @@ dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.1.1",
-    "httpx>=0.27.0",
     "ruff>=0.8.0",
 ]
 
@@ -41,7 +42,15 @@ lint.select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+    "tests/api",
+    "tests/cicd",
+    "tests/core",
+    "tests/scripts",
+    "tests/migrations",
+    "tests/middleware",
+]
 markers = [
     "integration: smoke and environment-dependent tests against external services such as Postgres",
 ]

@@ -12,8 +12,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 const roleOptions = [
-    { label: 'Guest', value: 'guest' },
-    { label: 'Lecturer', value: 'lecturer' },
+    { label: 'Student', value: 'student' },
+    { label: 'Teacher', value: 'teacher' },
+    { label: 'Admin', value: 'admin' },
 ]
 
 function Surface({ children, dark = false, mobile = false }: { children: ReactNode; dark?: boolean; mobile?: boolean }) {
@@ -56,7 +57,7 @@ export const DisabledStates: Story = {
             <div className="grid gap-4">
                 <Input label="Title" value="Quy dinh hoc vu 2024-2025" disabled readOnly />
                 <Textarea label="Notes" value="Archived records cannot be edited." disabled readOnly />
-                <Select label="Role" options={roleOptions} disabled value="lecturer" />
+                <Select label="Role" options={roleOptions} disabled value="teacher" />
                 <Checkbox label="Publish when approved" disabled checked />
             </div>
         </Surface>
@@ -69,7 +70,7 @@ export const DarkMode: Story = {
             <div className="grid gap-4">
                 <Input label="Title" placeholder="Document title" />
                 <Textarea label="Notes" placeholder="Internal notes..." />
-                <Select label="Role" options={roleOptions} value="lecturer" />
+                <Select label="Role" options={roleOptions} value="teacher" />
                 <Checkbox label="Publish when approved" hint="Dark surfaces keep the same focus treatment." />
             </div>
         </Surface>

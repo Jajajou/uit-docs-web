@@ -16,8 +16,7 @@ This backend now mirrors the frontend contract used by:
 - No live dependency on services outside `/web` during tests
 - Normalized error envelope aligned with the frontend API client
 - Role-aware routes with institutional email enforcement for:
-  - `lecturer`
-  - `operator`
+  - `teacher`
   - `admin`
 
 ## Contract-aligned endpoints
@@ -87,6 +86,15 @@ Legacy alias kept for compatibility:
 - `GET /api/analytics/graph-stats`
 - `GET /api/analytics/health`
 
+### LangGraph upstream
+
+The backend uses the LangGraph `/runs/wait` contract for live retrieval and indexing handoff. Keep the upstream request shape aligned with:
+
+- `docs/api/langgraph-api-hl.md`
+- health probe: `GET ${LANGGRAPH_UPSTREAM_URL}/ok`
+- retrieval assistant: `5bbc8364-e383-5087-8a2f-b6d27677f7a1`
+- indexing assistant: `7574d698-9ca8-5f8c-b908-365f58787a06`
+
 ## Error contract
 
 All handled failures return:
@@ -117,6 +125,26 @@ Real-provider handoff template:
 - `web/apps/admin-dashboard/backend/.env.sso.example`
 - workspace summary:
   - `web/docs/admin-dashboard/WEB_PROJECT_MASTER_STATUS.md`
+
+## Production hardening
+
+- Set `TRUSTED_HOSTS` to the exact backend domains that should be accepted.
+- Set `FORCE_HTTPS_REDIRECT=true` only when the app is behind HTTPS or a reverse proxy that forwards `x-forwarded-proto`.
+- Set `SESSION_COOKIE_SECURE=true` and `SESSION_COOKIE_DOMAIN=.gm.uit.edu.vn` for real deployments.
+- Keep `TEST_MODE=false` and `ENABLE_DEMO_AUTH=false` outside local CI.
+- Use `EXPOSE_ERROR_DETAILS=false` so unhandled `500` errors stay redacted to clients.
+
+Recommended production split:
+
+- frontend: Vercel static deploy from `web/apps/admin-dashboard/frontend`
+- backend: VM or container host serving `web/apps/admin-dashboard/backend`
+- domains:
+  - `app.gm.uit.edu.vn`
+  - `api.gm.uit.edu.vn`
+
+Deployment runbook:
+
+- `web/docs/admin-dashboard/DEPLOYMENT_RUNBOOK.md`
 
 ## Quality gates
 

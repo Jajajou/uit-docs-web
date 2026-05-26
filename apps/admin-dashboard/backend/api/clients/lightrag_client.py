@@ -152,7 +152,8 @@ class LightRAGClient:
             if not documents:
                 break
             for document in documents:
-                if str(document.get("file_path") or "") == file_path:
+                normalized_path = str(document.get("file_path") or document.get("file_source") or "").strip()
+                if normalized_path == file_path:
                     matches.append(document)
             pagination = result.get("pagination") if isinstance(result, dict) else {}
             if not isinstance(pagination, dict) or not pagination.get("has_next"):
@@ -245,12 +246,15 @@ class LightRAGClient:
         }
         if conversation_history:
             payload["conversation_history"] = conversation_history
-        response = self.session.post(
-            f"{self.base_url}/query",
-            json=payload,
-            headers=self._headers(),
-            timeout=DEFAULT_TIMEOUT * 2,
-        )
+        try:
+            response = self.session.post(
+                f"{self.base_url}/query",
+                json=payload,
+                headers=self._headers(),
+                timeout=DEFAULT_TIMEOUT * 2,
+            )
+        except Exception as exc:
+            return {"error": str(exc)}
         return response.json() if response.ok else {"error": response.text, "status_code": response.status_code}
 
 

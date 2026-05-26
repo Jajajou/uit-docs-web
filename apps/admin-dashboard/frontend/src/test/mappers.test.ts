@@ -20,10 +20,10 @@ import { reviewFixtures } from '@/mocks/fixtures/reviews'
 
 describe('DTO mappers', () => {
     it('maps session DTO into session domain model', () => {
-        const session = mapSessionDtoToSession(sessionFixtures.operator)
+        const session = mapSessionDtoToSession(sessionFixtures.teacher)
 
-        expect(session.user.role).toBe('operator')
-        expect(session.user.avatarInitials).toBe('LO')
+        expect(session.user.role).toBe('teacher')
+        expect(session.user.avatarInitials).toBe('PT')
     })
 
     it('groups document metadata into domain slices', () => {
@@ -37,7 +37,7 @@ describe('DTO mappers', () => {
             isCurrent: true,
             changeHighlights: expect.any(Array),
         })
-        expect(document.traceability?.reviewedByName).toBe('Le Thi Operator')
+        expect(document.traceability?.reviewedByName).toBe('Tran Van Admin')
         expect(document.activityHistory).toHaveLength(0)
     })
 

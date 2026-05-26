@@ -11,19 +11,19 @@ import {
 
 describe('auth bootstrap helpers', () => {
     it('builds a callback target with encoded return path', () => {
-        const target = buildAuthCallbackTarget('operator', '/portal/review?scenario=error')
+        const target = buildAuthCallbackTarget('admin', '/manager?scenario=error')
 
         expect(target).toContain('/auth/callback?')
         expect(target).toContain('bootstrap=1')
-        expect(target).toContain('role=operator')
-        expect(target).toContain('returnTo=%2Fportal%2Freview%3Fscenario%3Derror')
+        expect(target).toContain('role=admin')
+        expect(target).toContain('returnTo=%2Fmanager%3Fscenario%3Derror')
     })
 
     it('reads bootstrap query params safely', () => {
-        const params = new URLSearchParams('bootstrap=1&role=lecturer&returnTo=%2Fportal%2Fupload')
+        const params = new URLSearchParams('bootstrap=1&role=teacher&returnTo=%2Fupload')
 
-        expect(readBootstrapRole(params)).toBe('lecturer')
-        expect(readBootstrapReturnTo(params)).toBe('/portal/upload')
+        expect(readBootstrapRole(params)).toBe('teacher')
+        expect(readBootstrapReturnTo(params)).toBe('/upload')
     })
 
     it('builds the backend-owned SSO start target and reads auth errors safely', () => {
@@ -38,8 +38,8 @@ describe('auth bootstrap helpers', () => {
     })
 
     it('falls back to default paths when return target is not allowed', () => {
-        expect(resolveSessionRedirectPath('lecturer', '/portal/review')).toBe('/portal')
-        expect(resolveSessionRedirectPath('guest', '/admin/users')).toBe('/')
-        expect(resolveSessionRedirectPath('admin', '/admin/settings')).toBe('/admin/settings')
+        expect(resolveSessionRedirectPath('teacher', '/manager')).toBe('/chat')
+        expect(resolveSessionRedirectPath('student', '/manager')).toBe('/chat')
+        expect(resolveSessionRedirectPath('admin', '/manager')).toBe('/manager')
     })
 })

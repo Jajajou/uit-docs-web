@@ -200,6 +200,7 @@ def test_chat_stream_uses_live_lightrag_for_admin_when_enabled(client, monkeypat
     class FakeLightRAGClient:
         def query_text(self, query, **kwargs):
             assert query == "Hoc phi hoc ky 1 nam hoc 2024-2025 nhu the nao?"
+            assert kwargs["include_chunk_content"] is True
             return {
                 "response": "Hoc phi duoc tinh theo thong bao hoc phi da duoc duyet.",
                 "references": [
@@ -229,6 +230,111 @@ def test_chat_stream_uses_live_lightrag_for_admin_when_enabled(client, monkeypat
     assert body["message"]["warnings"] == []
 
 
+def test_chat_stream_strips_markdown_bold_markers_from_live_answer(client, monkeypatch):
+    class MarkdownLightRAGClient:
+        def query_text(self, query, **kwargs):
+            assert query == "Hoc phi hoc ky 2 co thay doi khong?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "response": (
+                    "Hoc phi hoc ky 2 **khong bi thay doi** theo **Thong Bao Hoc Phi Hoc Ky 2** "
+                    "va can doi chieu bang **ban da duoc duyet**."
+                ),
+                "references": [
+                    {
+                        "reference_id": "ref-live-001-markdown",
+                        "file_path": "/uploads/thong-bao-hoc-phi-hk2.docx",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(workspace_service_module, "get_lightrag_client", lambda: MarkdownLightRAGClient())
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("admin", "req-chat-live-001-markdown"),
+        json={
+            "message": "Hoc phi hoc ky 2 co thay doi khong?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "**" not in body["message"]["content"]
+    assert "khong bi thay doi" in body["message"]["content"]
+    assert "Thong Bao Hoc Phi Hoc Ky 2" in body["message"]["content"]
+
+
+def test_chat_stream_maps_partial_response_type_and_legacy_file_source_for_admin(client, monkeypatch):
+    class PartialAnswerLightRAGClient:
+        def query_text(self, query, **kwargs):
+            assert query == "Hoc phi hoc ky 1 nam hoc 2024-2025 nhu the nao?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "final_answer": "Hoc phi duoc tinh theo thong bao da duoc duyet, nhung can doi chieu them muc chi tiet.",
+                "response_type": "partial_answer",
+                "references": [
+                    {
+                        "reference_id": "ref-live-001b",
+                        "file_source": "/uploads/quy-dinh-hoc-vu-2024-2025.pdf",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(workspace_service_module, "get_lightrag_client", lambda: PartialAnswerLightRAGClient())
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("admin", "req-chat-live-001b"),
+        json={
+            "message": "Hoc phi hoc ky 1 nam hoc 2024-2025 nhu the nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["content"] == "Hoc phi duoc tinh theo thong bao da duoc duyet, nhung can doi chieu them muc chi tiet."
+    assert body["message"]["confidence"] == 0.66
+    assert body["message"]["references"][0]["href"] == "/documents/doc-001"
+    assert body["message"]["warnings"][0]["code"] == "partial_answer"
+
+
+def test_chat_stream_refuses_strong_conclusion_when_live_sources_are_only_indirectly_related(client, monkeypatch):
+    class WeakGroundingLightRAGClient:
+        def query_text(self, query, **kwargs):
+            assert query == "Thong bao hoc phi hien tai con hieu luc khong?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "response": "Thong bao hoc phi hien tai khong con hieu luc va nen doi chieu voi quy dinh hoc vu 2024-2025.",
+                "references": [
+                    {
+                        "reference_id": "ref-live-weak-001",
+                        "file_path": "/uploads/missing-weak-source.pdf",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(workspace_service_module, "get_lightrag_client", lambda: WeakGroundingLightRAGClient())
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("admin", "req-chat-live-weak-001"),
+        json={
+            "message": "Thong bao hoc phi hien tai con hieu luc khong?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "chua co du can cu" in workspace_service_module.normalize_search_text(body["message"]["content"])
+    assert body["message"]["warnings"][0]["code"] == "insufficient_grounding"
+    assert body["message"]["confidence"] == 0.38
+    assert body["message"]["references"][0]["href"] == "/documents"
+
+
 def test_chat_stream_uses_public_catalog_path_for_student_even_when_live_enabled(client, monkeypatch):
     class FakePublicLightRAGClient:
         def __init__(self):
@@ -245,7 +351,8 @@ def test_chat_stream_uses_public_catalog_path_for_student_even_when_live_enabled
             return {"status": "success", "track_id": "public-seed-track"}
 
         def query_text(self, query, **kwargs):
-            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert "Câu hỏi: Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?" in query
+            assert "Phân biệt rõ giữa khóa tuyển sinh và năm học." in query
             return {
                 "response": "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT.",
                 "references": [
@@ -271,10 +378,192 @@ def test_chat_stream_uses_public_catalog_path_for_student_even_when_live_enabled
 
     assert response.status_code == 200
     body = response.json()
-    assert "cong bo" in body["message"]["content"]
+    assert "Theo các tài liệu công khai UIT đang được trích dẫn về lịch đăng ký môn học:" in body["message"]["content"]
+    assert "Thông báo lịch đăng ký môn học" in body["message"]["content"]
+    assert "Mở mục \"Nguồn tài liệu\"" in body["message"]["content"]
     assert body["message"]["references"][0]["href"] == "/documents/doc-004"
     assert body["message"]["warnings"] == []
     assert "admin-dashboard-public://doc-004" in public_client.inserted_sources
+
+
+def test_chat_stream_maps_partial_response_type_and_legacy_file_source_for_student(client, monkeypatch):
+    class PartialAnswerPublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+
+        def find_document_ids_by_file_path(self, file_path):
+            return []
+
+        def delete_document(self, doc_ids):
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            self.inserted_sources.append(source)
+            return {"status": "success", "track_id": "public-seed-track"}
+
+        def query_text(self, query, **kwargs):
+            return {
+                "generated_response": "Co mot phan thong tin da duoc xac nhan trong tai lieu cong khai.",
+                "response_type": "partial_answer",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-001b",
+                        "file_source": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    public_client = PartialAnswerPublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002e"),
+        json={
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert body["message"]["confidence"] == 0.56
+    assert body["message"]["warnings"][0]["code"] == "partial_answer"
+    assert "Thông báo lịch đăng ký môn học" in body["message"]["content"]
+
+
+def test_public_workspace_document_text_uses_seed_excerpt_and_clean_vietnamese():
+    service = get_workspace_service()
+    document = service.store.get_document_by_id("doc-004")
+
+    assert document is not None
+
+    text = service._build_public_workspace_document_text(document)
+
+    assert "Trích yếu nội dung:" in text
+    assert "Thông báo lịch đăng ký môn học áp dụng trực tiếp cho sinh viên khóa tuyển sinh 2024, 2025 và 2026." in text
+    assert "Thời gian đăng ký từ ngày 20/03/2026 đến ngày 05/04/2026." in text
+    assert "Đơn vị ban hành: Phòng Đào tạo Đại học" in text
+    assert "Khóa tuyển sinh liên quan: 2024, 2025, 2026" in text
+
+
+def test_chat_live_sync_persists_langgraph_result_for_student(client):
+    response = client.post(
+        "/api/chat/live-sync",
+        headers=auth_headers("student", "req-chat-live-sync-001"),
+        json={
+            "conversationId": "conv-live-sync-student",
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+            "result": {
+                "generated_response": "Co mot phan thong tin da duoc xac nhan trong tai lieu cong khai.",
+                "response_type": "partial_answer",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-sync-001",
+                        "file_source": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["conversation_id"] == "conv-live-sync-student"
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert body["message"]["warnings"][0]["code"] == "partial_answer"
+    assert body["message"]["content"] == "Co mot phan thong tin da duoc xac nhan trong tai lieu cong khai."
+
+    sessions = client.get("/api/chat/sessions", headers=auth_headers("student", "req-chat-live-sync-002"))
+
+    assert sessions.status_code == 200
+    assert sessions.json()["conversations"][0]["id"] == "conv-live-sync-student"
+
+
+def test_chat_live_sync_keeps_langgraph_answer_when_public_grounding_is_weak(client):
+    response = client.post(
+        "/api/chat/live-sync",
+        headers=auth_headers("student", "req-chat-live-sync-003"),
+        json={
+            "conversationId": "conv-live-sync-weak-grounding",
+            "message": "Hoc phi khoa moi nhat la bao nhieu?",
+            "result": {
+                "final_answer": (
+                    "Hoc phi ap dung cho khoa sinh vien moi nhat la 42.000.000 dong/nam hoc, "
+                    "ap dung cho sinh vien chinh quy nam hoc 2025-2026."
+                ),
+                "response_type": "full_answer",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-sync-weak-001",
+                        "file_source": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "42.000.000 dong/nam hoc" in body["message"]["content"]
+    assert "hien toi moi tim thay" not in workspace_service_module.normalize_search_text(body["message"]["content"])
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+
+
+def test_chat_live_sync_keeps_langgraph_answer_without_references(client):
+    response = client.post(
+        "/api/chat/live-sync",
+        headers=auth_headers("student", "req-chat-live-sync-004"),
+        json={
+            "conversationId": "conv-live-sync-no-refs",
+            "message": "Hoc phi khoa moi nhat la bao nhieu?",
+            "result": {
+                "final_answer": (
+                    "Hoc phi ap dung cho khoa sinh vien moi nhat la 42.000.000 dong/nam hoc.\n\n"
+                    "Tai lieu tham khao\n- Thong bao hoc phi"
+                ),
+                "response_type": "full_answer",
+                "references": [],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["content"] == "Hoc phi ap dung cho khoa sinh vien moi nhat la 42.000.000 dong/nam hoc."
+    assert body["message"]["references"] == []
+    assert body["message"]["warnings"][-1]["code"] == "insufficient_grounding"
+
+
+def test_chat_live_sync_extracts_markdown_references_when_live_payload_has_no_structured_sources(client):
+    response = client.post(
+        "/api/chat/live-sync",
+        headers=auth_headers("student", "req-chat-live-sync-005"),
+        json={
+            "conversationId": "conv-live-sync-markdown-refs",
+            "message": "Hoc phi hoc ky 1 nam hoc 2024-2025 nhu the nao?",
+            "result": {
+                "final_answer": (
+                    "Hoc phi hoc ky 1 nam hoc 2024-2025 duoc tinh theo so tin chi dang ky.\n\n"
+                    "## Tai lieu tham khao\n"
+                    "- [Quy dinh hoc vu 2024-2025](/uploads/quy-dinh-hoc-vu-2024-2025.pdf)\n"
+                    "- [Thong bao dang ky mon hoc](https://daa.uit.edu.vn/sites/daa/files/202603/thong_bao_lich_dang_ky_mon_hoc_2026.pdf)"
+                ),
+                "response_type": "partial_answer",
+                "references": [],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["content"] == "Hoc phi hoc ky 1 nam hoc 2024-2025 duoc tinh theo so tin chi dang ky."
+    assert body["message"]["references"][0]["href"].startswith("/documents/doc-")
+    assert body["message"]["references"][1]["href"] == "https://daa.uit.edu.vn/sites/daa/files/202603/thong_bao_lich_dang_ky_mon_hoc_2026.pdf"
+    assert body["message"]["references"][1]["title"] == "Thong bao dang ky mon hoc"
+    assert body["message"]["warnings"][0]["code"] == "partial_answer"
 
 
 def test_chat_stream_falls_back_to_public_catalog_when_public_live_query_fails(client, monkeypatch):
@@ -349,7 +638,8 @@ def test_chat_stream_reseeds_failed_public_documents_before_live_query(client, m
             return {"status": "success", "track_id": f"track-{len(self.inserted_sources)}"}
 
         def query_text(self, query, **kwargs):
-            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert "Câu hỏi: Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?" in query
+            assert "Phân biệt rõ giữa khóa tuyển sinh và năm học." in query
             return {
                 "response": "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT.",
                 "references": [
@@ -376,7 +666,8 @@ def test_chat_stream_reseeds_failed_public_documents_before_live_query(client, m
 
     assert response.status_code == 200
     body = response.json()
-    assert "cong bo" in body["message"]["content"]
+    assert "Theo các tài liệu công khai UIT đang được trích dẫn về lịch đăng ký môn học:" in body["message"]["content"]
+    assert "Thông báo lịch đăng ký môn học" in body["message"]["content"]
     assert body["message"]["references"][0]["href"] == "/documents/doc-004"
     assert body["message"]["warnings"] == []
     assert set(public_client.deleted_doc_ids) == {"failed-doc-001", "failed-doc-004"}
@@ -446,6 +737,7 @@ def test_chat_stream_forces_public_reseed_when_live_query_returns_no_context(cli
     assert response.status_code == 200
     body = response.json()
     assert "2026-03-20" in body["message"]["content"]
+    assert "Mở mục \"Nguồn tài liệu\"" in body["message"]["content"]
     assert body["message"]["references"][0]["href"] == "/documents/doc-004"
     assert public_client.query_count == 2
     assert {
@@ -454,7 +746,7 @@ def test_chat_stream_forces_public_reseed_when_live_query_returns_no_context(cli
     }.issubset(set(public_client.inserted_sources))
 
 
-def test_chat_stream_returns_502_when_live_lightrag_fails(client, monkeypatch):
+def test_chat_stream_falls_back_to_contract_reply_when_live_lightrag_fails(client, monkeypatch):
     class FailingLightRAGClient:
         def query_text(self, query, **kwargs):
             return {"error": "downstream timeout"}
@@ -470,8 +762,12 @@ def test_chat_stream_returns_502_when_live_lightrag_fails(client, monkeypatch):
         },
     )
 
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "lightrag_query_failed"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["confidence"] == 0.24
+    assert body["message"]["references"][0]["href"] == "/documents/doc-001"
+    assert body["message"]["warnings"][-1]["code"] == "live_backend_unavailable"
+    assert "phan hoi du phong" in workspace_service_module.normalize_search_text(body["message"]["content"])
 
 
 def test_chat_stream_forces_internal_reseed_when_live_query_returns_no_context(client, monkeypatch):
@@ -571,3 +867,355 @@ def test_analytics_health_reflects_live_lightrag_when_enabled(client, monkeypatc
     assert health.json()["lightrag"] == "healthy"
     assert health.json()["lightrag_url"] == "http://127.0.0.1:9622"
 
+
+def test_chat_stream_uses_public_catalog_path_for_student_even_when_live_enabled(client, monkeypatch):
+    class FakePublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+
+        def find_document_ids_by_file_path(self, file_path):
+            return []
+
+        def delete_document(self, doc_ids):
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            self.inserted_sources.append(source)
+            return {"status": "success", "track_id": "public-seed-track"}
+
+        def query_text(self, query, **kwargs):
+            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "response": "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT.",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-001",
+                        "file_path": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    public_client = FakePublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002"),
+        json={
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["content"] == "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT."
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert body["message"]["warnings"] == []
+    assert "admin-dashboard-public://doc-004" in public_client.inserted_sources
+
+
+def test_chat_stream_maps_partial_response_type_and_legacy_file_source_for_student(client, monkeypatch):
+    class PartialAnswerPublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+
+        def find_document_ids_by_file_path(self, file_path):
+            return []
+
+        def delete_document(self, doc_ids):
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            self.inserted_sources.append(source)
+            return {"status": "success", "track_id": "public-seed-track"}
+
+        def query_text(self, query, **kwargs):
+            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "generated_response": "Co mot phan thong tin da duoc xac nhan trong tai lieu cong khai.",
+                "response_type": "partial_answer",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-001b",
+                        "file_source": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    public_client = PartialAnswerPublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002e"),
+        json={
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert body["message"]["confidence"] == 0.56
+    assert body["message"]["warnings"][0]["code"] == "partial_answer"
+    assert body["message"]["content"] == "Co mot phan thong tin da duoc xac nhan trong tai lieu cong khai."
+
+
+def test_chat_stream_reseeds_failed_public_documents_before_live_query(client, monkeypatch):
+    class RecoveringPublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+            self.deleted_doc_ids: list[str] = []
+            self.poll_counts: dict[str, int] = {}
+            self.documents_by_source = {
+                "admin-dashboard-public://doc-001": [{"id": "failed-doc-001", "status": "failed"}],
+                "admin-dashboard-public://doc-004": [{"id": "failed-doc-004", "status": "failed"}],
+            }
+
+        def find_documents_by_file_path(self, file_path):
+            documents = [dict(document) for document in self.documents_by_source.get(file_path, [])]
+            if documents and documents[0]["status"] == "processing":
+                self.poll_counts[file_path] = self.poll_counts.get(file_path, 0) + 1
+                if self.poll_counts[file_path] >= 2:
+                    documents = [{"id": documents[0]["id"], "status": "processed"}]
+                    self.documents_by_source[file_path] = [dict(documents[0])]
+            return documents
+
+        def find_document_ids_by_file_path(self, file_path):
+            return [document["id"] for document in self.find_documents_by_file_path(file_path)]
+
+        def delete_document(self, doc_ids):
+            self.deleted_doc_ids.extend(doc_ids)
+            for file_path, documents in list(self.documents_by_source.items()):
+                self.documents_by_source[file_path] = [
+                    document for document in documents if document["id"] not in doc_ids
+                ]
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            assert source is not None
+            self.inserted_sources.append(source)
+            self.documents_by_source[source] = [
+                {"id": f"processed-{source.rsplit('://', 1)[-1]}", "status": "processing"}
+            ]
+            return {"status": "success", "track_id": f"track-{len(self.inserted_sources)}"}
+
+        def query_text(self, query, **kwargs):
+            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "response": "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT.",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-002",
+                        "file_path": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    monkeypatch.setattr(workspace_service_module, "sleep", lambda _: None)
+    public_client = RecoveringPublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002c"),
+        json={
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["message"]["content"] == "Lich dang ky mon hoc khoa 2024 da duoc cong bo trong thong bao cong khai cua UIT."
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert body["message"]["warnings"] == []
+    assert set(public_client.deleted_doc_ids) == {"failed-doc-001", "failed-doc-004"}
+    assert {
+        "admin-dashboard-public://doc-001",
+        "admin-dashboard-public://doc-004",
+    }.issubset(set(public_client.inserted_sources))
+
+
+def test_chat_stream_forces_public_reseed_when_live_query_returns_no_context(client, monkeypatch):
+    class EmptyThenReadyPublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+            self.query_count = 0
+            self.documents_by_source = {
+                "admin-dashboard-public://doc-001": [{"id": "processed-doc-001", "status": "processed"}],
+                "admin-dashboard-public://doc-004": [{"id": "processed-doc-004", "status": "processed"}],
+            }
+
+        def find_documents_by_file_path(self, file_path):
+            return [dict(document) for document in self.documents_by_source.get(file_path, [])]
+
+        def find_document_ids_by_file_path(self, file_path):
+            return [document["id"] for document in self.find_documents_by_file_path(file_path)]
+
+        def delete_document(self, doc_ids):
+            for file_path, documents in list(self.documents_by_source.items()):
+                self.documents_by_source[file_path] = [
+                    document for document in documents if document["id"] not in doc_ids
+                ]
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            assert source is not None
+            self.inserted_sources.append(source)
+            self.documents_by_source[source] = [{"id": f"reseeded-{source.rsplit('://', 1)[-1]}", "status": "processed"}]
+            return {"status": "success", "track_id": f"track-{len(self.inserted_sources)}"}
+
+        def query_text(self, query, **kwargs):
+            assert query == "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?"
+            assert kwargs["include_chunk_content"] is True
+            self.query_count += 1
+            if self.query_count == 1:
+                return {"response": "No relevant context found.", "references": []}
+            return {
+                "response": "Thong bao cong khai xac nhan lich dang ky mon hoc khoa 2024 tu 2026-03-20 den 2026-04-05.",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-003",
+                        "file_path": "admin-dashboard-public://doc-004",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    monkeypatch.setattr(workspace_service_module, "sleep", lambda _: None)
+    public_client = EmptyThenReadyPublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002d"),
+        json={
+            "message": "Lich dang ky mon hoc cua khoa 2024 bat dau khi nao?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "2026-03-20" in body["message"]["content"]
+    assert body["message"]["references"][0]["href"] == "/documents/doc-004"
+    assert public_client.query_count == 2
+    assert {
+        "admin-dashboard-public://doc-001",
+        "admin-dashboard-public://doc-004",
+    }.issubset(set(public_client.inserted_sources))
+
+
+def test_chat_stream_returns_low_grounding_warning_for_student_when_public_live_sources_are_indirect(client, monkeypatch):
+    class WeakGroundingPublicLightRAGClient:
+        def __init__(self):
+            self.inserted_sources: list[str] = []
+
+        def find_document_ids_by_file_path(self, file_path):
+            return []
+
+        def delete_document(self, doc_ids):
+            return {"status": "deleted"}
+
+        def insert_text(self, text, source=None):
+            self.inserted_sources.append(source)
+            return {"status": "success", "track_id": "public-seed-track"}
+
+        def query_text(self, query, **kwargs):
+            assert query == "Thong bao hoc phi hien tai con hieu luc khong?"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "response": "Thong bao hoc phi hien tai khong con hieu luc va nen doi chieu voi quy dinh hoc vu 2024-2025.",
+                "references": [
+                    {
+                        "reference_id": "ref-public-live-weak-001",
+                        "file_path": "admin-dashboard-public://missing-weak-source",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "http://127.0.0.1:9623")
+    public_client = WeakGroundingPublicLightRAGClient()
+    monkeypatch.setattr(workspace_service_module, "get_public_lightrag_client", lambda: public_client)
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-live-002f"),
+        json={
+            "message": "Thong bao hoc phi hien tai con hieu luc khong?",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "chua co du can cu" in workspace_service_module.normalize_search_text(body["message"]["content"])
+    assert body["message"]["warnings"][0]["code"] == "insufficient_grounding"
+    assert body["message"]["confidence"] == 0.32
+    assert body["message"]["references"][0]["href"] == "/documents"
+
+
+def test_chat_stream_preserves_full_langgraph_answer_with_external_references(client, monkeypatch):
+    class FullAnswerLangGraphClient:
+        def query_text(self, query, **kwargs):
+            assert query == "hoc phi khoa moi nhat"
+            assert kwargs["include_chunk_content"] is True
+            return {
+                "final_answer": "Hoc phi du kien nam hoc 2025-2026 la 42.000.000 dong/nam hoc.",
+                "response_type": "full_answer",
+                "retrieved_chunks": [
+                    {
+                        "reference_id": "ref-local-temporal-001",
+                        "file_path": "admin-dashboard-public://doc-004",
+                    },
+                    {
+                        "reference_id": "ref-langgraph-fee-001",
+                        "title": "Thong bao hoc phi 2025-2026",
+                        "content": "Hoc phi du kien nam hoc 2025-2026 la 42.000.000 dong/nam hoc.",
+                        "metadata": {
+                            "url": "https://external.example.edu/not-in-store-hoc-phi-2025.pdf",
+                        },
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(settings, "TEST_MODE", False)
+    monkeypatch.setattr(settings, "LIVE_INGESTION_MODE", True)
+    monkeypatch.setattr(settings, "LIGHTRAG_PUBLIC_URL", "")
+    monkeypatch.setattr(settings, "LANGGRAPH_PUBLIC_ASSISTANT_ID", "retrieval")
+    monkeypatch.setattr(
+        workspace_service_module.InMemoryWorkspaceService,
+        "_ensure_public_workspace_seeded",
+        lambda self: None,
+    )
+    monkeypatch.setattr(
+        workspace_service_module.InMemoryWorkspaceService,
+        "_wait_for_public_workspace_ready",
+        lambda self: None,
+    )
+    monkeypatch.setattr(workspace_service_module, "get_public_langgraph_client", lambda: FullAnswerLangGraphClient())
+
+    response = client.post(
+        "/api/chat/stream",
+        headers=auth_headers("student", "req-chat-langgraph-full-001"),
+        json={
+            "message": "hoc phi khoa moi nhat",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    normalized_content = workspace_service_module.normalize_search_text(body["message"]["content"])
+    assert "42.000.000" in normalized_content
+    assert "chua co du can cu" not in normalized_content
+    assert body["message"]["warnings"] == []
+    assert any(reference["href"].startswith("https://external.example.edu/") for reference in body["message"]["references"])

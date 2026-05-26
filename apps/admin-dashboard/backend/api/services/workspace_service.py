@@ -18,11 +18,13 @@ from urllib.parse import urlparse
 from typing import Any, cast
 from uuid import uuid4
 
+from api.clients.langgraph_client import get_internal_langgraph_client, get_public_langgraph_client
 from api.clients.lightrag_client import get_lightrag_client, get_public_lightrag_client
 from api.config import settings
 from api.errors import ApiServiceError
 from api.schemas import Role
-from api.services.fixtures import INTERNAL_EMAIL_DOMAIN
+from api.services.chat_result_adapter import normalize_chat_result, normalize_reference_path
+from api.services.fixtures import INTERNAL_EMAIL_DOMAIN, get_document_index_excerpt, normalize_workspace_state
 from api.services.workspace_store import WorkspaceStateStore
 
 INTERNAL_ROLES = {"teacher", "admin"}
@@ -59,6 +61,7 @@ class InMemoryWorkspaceService:
         if store is None:
             raise ValueError("A workspace store must be provided.")
         self.store = store
+        self._normalize_persisted_workspace_state()
         self._internal_workspace_seeded = False
         self._public_workspace_seeded = False
 
@@ -66,6 +69,12 @@ class InMemoryWorkspaceService:
         self.store.reset()
         self._internal_workspace_seeded = False
         self._public_workspace_seeded = False
+
+    def _normalize_persisted_workspace_state(self) -> None:
+        snapshot = self.store.get_state()
+        normalized_snapshot = normalize_workspace_state(snapshot)
+        if normalized_snapshot != snapshot:
+            self.store.save_state(cast(dict, normalized_snapshot))
 
     def _raise(self, status_code: int, code: str, message: str, details: Any = None) -> None:
         raise ApiServiceError(status_code=status_code, code=code, message=message, details=details)
@@ -1158,7 +1167,41 @@ class InMemoryWorkspaceService:
             and document["lifecycle_status"] in {"approved", "archived"}
         ]
 
-    def _score_public_document_for_chat(self, document: dict, question: str) -> float:
+    def _list_internal_chat_documents(self) -> list[dict]:
+        return [
+            document
+            for document in self.store.list_all_documents()
+            if document["lifecycle_status"] in {"approved", "archived"}
+        ]
+
+    def _question_requests_current_validity(self, question: str) -> bool:
+        normalized_question = normalize_search_text(question)
+        return any(
+            marker in normalized_question
+            for marker in (
+                "con hieu luc",
+                "het hieu luc",
+                "hieu luc khong",
+                "dang ap dung",
+                "hien tai con",
+            )
+        )
+
+    def _question_needs_strict_grounding(self, question: str) -> bool:
+        return self._question_requests_current_validity(question) or self._question_requests_change_verification(question)
+
+    def _minimum_grounding_score(self, question: str) -> float:
+        normalized_question = normalize_search_text(question)
+        threshold = 4.0
+        if self._question_needs_strict_grounding(question):
+            threshold += 1.5
+        if any(phrase in normalized_question for phrase in ("hoc phi", "hoc bong", "dang ky mon hoc", "lich dang ky")):
+            threshold += 0.5
+        if "thong bao" in normalized_question:
+            threshold += 0.5
+        return threshold
+
+    def _score_document_for_chat(self, document: dict, question: str) -> float:
         question_text = self._normalize_chat_text(question)
         question_tokens = self._normalize_chat_tokens(question)
         if not question_tokens:
@@ -1169,9 +1212,11 @@ class InMemoryWorkspaceService:
         tags_joined = " ".join(tags)
         issuing_unit = self._normalize_chat_text(document["supplemental_metadata"].get("issuing_unit"))
         notes = self._normalize_chat_text(document["supplemental_metadata"].get("notes"))
+        excerpt = self._normalize_chat_text(self._build_document_index_excerpt(document))
         temporal_metadata = document.get("temporal_metadata", {})
         document_number = self._normalize_chat_text(temporal_metadata.get("document_number"))
         academic_year = self._normalize_chat_text(temporal_metadata.get("academic_year"))
+        document_type = self._normalize_chat_text(temporal_metadata.get("document_type"))
         cohort_years = {str(year) for year in temporal_metadata.get("cohort_years", [])}
 
         score = 0.0
@@ -1184,6 +1229,10 @@ class InMemoryWorkspaceService:
                 score += 2.5
             if token in academic_year:
                 score += 1.8
+            if token in document_type:
+                score += 1.6
+            if token in excerpt:
+                score += 1.2
             if token in issuing_unit:
                 score += 0.8
             if token in notes:
@@ -1192,18 +1241,44 @@ class InMemoryWorkspaceService:
                 score += 1.6
 
         phrase_weights = {
+            "thong bao hoc phi": 5.0,
             "hoc phi": 4.0,
             "hoc vu": 4.0,
             "hoc bong": 4.0,
+            "tam hoan hoc phi": 4.5,
+            "hoc phi hoc ky": 4.2,
             "dang ky mon hoc": 5.0,
             "lich dang ky": 4.5,
             "quy dinh": 3.5,
             "thong bao": 2.0,
         }
-        combined_text = " ".join(filter(None, [title, tags_joined, notes, issuing_unit, document_number, academic_year]))
+        combined_text = " ".join(
+            filter(None, [title, tags_joined, notes, issuing_unit, document_number, academic_year, document_type, excerpt])
+        )
         for phrase, weight in phrase_weights.items():
             if phrase in question_text and phrase in combined_text:
                 score += weight
+
+        topic_penalties = {
+            "thong bao hoc phi": 4.8,
+            "hoc phi": 2.8,
+            "tam hoan hoc phi": 3.2,
+            "hoc phi hoc ky": 3.6,
+            "hoc bong": 2.6,
+            "dang ky mon hoc": 3.0,
+            "lich dang ky": 2.8,
+        }
+        for phrase, penalty in topic_penalties.items():
+            if phrase in question_text and phrase not in combined_text:
+                score -= penalty
+
+        if self._question_requests_current_validity(question):
+            if temporal_metadata.get("valid_from"):
+                score += 1.8
+            if temporal_metadata.get("valid_until"):
+                score += 1.2
+            if temporal_metadata.get("academic_year"):
+                score += 0.8
 
         if temporal_metadata.get("academic_year") and academic_year and academic_year in question_text:
             score += 2.5
@@ -1213,12 +1288,28 @@ class InMemoryWorkspaceService:
 
         return max(score, 0.0)
 
+    def _score_public_document_for_chat(self, document: dict, question: str) -> float:
+        return self._score_document_for_chat(document, question)
+
+    def _rank_documents_for_chat(self, documents: list[dict], question: str) -> list[dict]:
+        return sorted(
+            (
+                {
+                    "document": document,
+                    "score": self._score_document_for_chat(document, question),
+                }
+                for document in documents
+            ),
+            key=lambda item: item["score"],
+            reverse=True,
+        )
+
     def _build_public_reference_excerpt(self, document: dict) -> str:
         temporal_metadata = document.get("temporal_metadata", {})
         document_number = temporal_metadata.get("document_number")
         valid_from = temporal_metadata.get("valid_from")
         valid_until = temporal_metadata.get("valid_until")
-        notes = str(document["supplemental_metadata"].get("notes") or "").strip()
+        excerpt = self._build_document_index_excerpt(document)
 
         parts: list[str] = []
         if document_number:
@@ -1227,8 +1318,8 @@ class InMemoryWorkspaceService:
             parts.append(f"Hiệu lực từ {valid_from} đến {valid_until}.")
         elif valid_from:
             parts.append(f"Có thông tin hiệu lực từ {valid_from}.")
-        if notes:
-            parts.append(notes)
+        if excerpt:
+            parts.append(excerpt.splitlines()[0].strip())
         return " ".join(parts).strip() or "Tài liệu công khai được phê duyệt để tra cứu trên UIT AI."
 
     def _build_public_reference(self, document: dict) -> dict:
@@ -1240,12 +1331,237 @@ class InMemoryWorkspaceService:
             "status_label": self._status_label_for_reference_document(document),
         }
 
+    def _build_public_answer_intro(self, question: str) -> str:
+        normalized_question = normalize_search_text(question)
+        if "lich dang ky" in normalized_question or ("dang ky" in normalized_question and "mon hoc" in normalized_question):
+            return "Theo các tài liệu công khai UIT đang được trích dẫn về lịch đăng ký môn học:"
+        if "hoc phi" in normalized_question:
+            return "Theo các tài liệu công khai UIT đang được trích dẫn về học phí:"
+        if "hoc bong" in normalized_question:
+            return "Theo các tài liệu công khai UIT đang được trích dẫn về học bổng:"
+        if "hoc vu" in normalized_question or "quy dinh" in normalized_question:
+            return "Theo các tài liệu công khai UIT đang được trích dẫn về học vụ:"
+        return "Theo các tài liệu công khai UIT đang được trích dẫn:"
+
+    def _rank_reference_documents_for_chat(self, references: list[dict], question: str) -> list[dict]:
+        ranked: list[dict] = []
+        for reference in references:
+            document = self._find_document_for_reference(self._reference_file_path(reference))
+            score = self._score_document_for_chat(document, question) if document is not None else 0.0
+            ranked.append(
+                {
+                    "reference": reference,
+                    "document": document,
+                    "score": score,
+                }
+            )
+        ranked.sort(key=lambda item: item["score"], reverse=True)
+        return ranked
+
+    def _filter_references_for_chat(self, references: list[dict], question: str) -> tuple[list[dict], list[dict]]:
+        ranked = self._rank_reference_documents_for_chat(references, question)
+        filtered: list[dict] = []
+        seen_hrefs: set[str] = set()
+        for item in ranked:
+            reference = item["reference"]
+            href = str(reference.get("href") or "")
+            if href and href in seen_hrefs:
+                continue
+            if item["score"] <= 0 and filtered and not href.startswith(("http://", "https://")):
+                continue
+            filtered.append(reference)
+            if href:
+                seen_hrefs.add(href)
+            if len(filtered) >= 4:
+                break
+        return (filtered or references[:3], ranked)
+
+    def _references_have_strong_grounding(self, ranked_reference_documents: list[dict], question: str) -> bool:
+        if not ranked_reference_documents:
+            return False
+        return ranked_reference_documents[0]["score"] >= self._minimum_grounding_score(question)
+
+    def _has_trusted_external_live_answer(
+        self,
+        *,
+        response_type: str,
+        raw_response: str,
+        references: list[dict],
+    ) -> bool:
+        if response_type != "full_answer" or not raw_response.strip():
+            return False
+
+        return any(
+            str(reference.get("href") or reference.get("url") or "").startswith(("http://", "https://"))
+            and str(reference.get("excerpt") or "").strip()
+            for reference in references
+        )
+
+    def _build_low_grounding_chat_reply(
+        self,
+        question: str,
+        references: list[dict],
+        *,
+        public_surface: bool,
+        ranked_reference_documents: list[dict] | None = None,
+    ) -> dict:
+        ranked = ranked_reference_documents or self._rank_reference_documents_for_chat(references, question)
+        filtered_references = [item["reference"] for item in ranked if item["score"] > 0][:2] or references[:1]
+        top_document = ranked[0]["document"] if ranked else None
+
+        if top_document is not None:
+            document_number = str(top_document.get("temporal_metadata", {}).get("document_number") or "").strip()
+            label = f'"{top_document["title"]}"'
+            if document_number:
+                label += f" ({document_number})"
+            detail = (
+                f"Nguồn khớp nhất hiện tại là {label}, nhưng mức liên quan chưa đủ mạnh "
+                "để xác nhận trực tiếp kết luận này."
+            )
+        else:
+            detail = "Các nguồn đang đối chiếu chưa khớp đủ mạnh với đúng chủ đề bạn hỏi."
+
+        if self._question_needs_strict_grounding(question):
+            content = (
+                "Hiện tôi chưa có đủ căn cứ để kết luận chắc chắn. "
+                f"{detail} Bạn nên đối chiếu đúng thông báo hoặc văn bản cần xác minh trước khi chốt kết luận."
+            )
+        else:
+            content = (
+                "Hiện tôi mới tìm thấy một số nguồn liên quan gián tiếp. "
+                f"{detail} Tôi cần thêm nguồn khớp trực tiếp hơn để trả lời chắc chắn."
+            )
+
+        return {
+            "id": f"msg-{uuid4().hex[:8]}",
+            "role": "assistant",
+            "content": content,
+            "created_at": utc_now_iso(),
+            "confidence": 0.32 if public_surface else 0.38,
+            "references": filtered_references,
+            "warnings": [
+                {
+                    "code": "insufficient_grounding",
+                    "message": (
+                        "Nguồn truy xuất hiện mới dừng ở mức liên quan, chưa đủ mạnh để xác nhận trực tiếp câu trả lời."
+                    ),
+                }
+            ],
+        }
+
+    def _parse_temporal_date(self, value: str | None) -> datetime | None:
+        raw_value = str(value or "").strip()
+        if not raw_value:
+            return None
+        try:
+            return datetime.strptime(raw_value, "%Y-%m-%d").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+
+    def _build_temporal_validity_answer(self, question: str, document: dict | None) -> str | None:
+        if document is None or not self._question_requests_current_validity(question):
+            return None
+
+        temporal_metadata = document.get("temporal_metadata", {})
+        valid_from = str(temporal_metadata.get("valid_from") or "").strip()
+        valid_until = str(temporal_metadata.get("valid_until") or "").strip()
+        academic_year = str(temporal_metadata.get("academic_year") or "").strip()
+        if not valid_from and not valid_until:
+            return None
+
+        label = f'"{document["title"]}"'
+        document_number = str(temporal_metadata.get("document_number") or "").strip()
+        if document_number:
+            label += f" ({document_number})"
+
+        now_date = datetime.now(UTC).date()
+        from_date = self._parse_temporal_date(valid_from)
+        until_date = self._parse_temporal_date(valid_until)
+
+        if from_date is not None and until_date is not None:
+            if from_date.date() <= now_date <= until_date.date():
+                status_line = f"Theo metadata hiện có, {label} đang trong thời gian hiệu lực từ {valid_from} đến {valid_until}."
+            elif now_date < from_date.date():
+                status_line = f"Theo metadata hiện có, {label} chưa đến thời điểm áp dụng; mốc hiệu lực bắt đầu từ {valid_from}."
+            else:
+                status_line = f"Theo metadata hiện có, {label} đã hết hiệu lực sau ngày {valid_until}."
+        elif from_date is not None:
+            status_line = f"Theo metadata hiện có, {label} được ghi nhận áp dụng từ {valid_from}."
+        else:
+            status_line = f"Theo metadata hiện có, {label} có mốc hiệu lực đến {valid_until}."
+
+        notes: list[str] = []
+        if academic_year:
+            notes.append(f"Tài liệu này gắn với ngữ cảnh năm học {academic_year}.")
+        if not valid_until:
+            notes.append("Nguồn hiện chưa nêu rõ mốc kết thúc nên vẫn cần đối chiếu thêm thông báo mới hơn trước khi kết luận chắc chắn.")
+
+        return " ".join([status_line, *notes]).strip()
+
+    def _question_requests_change_verification(self, question: str) -> bool:
+        normalized_question = normalize_search_text(question)
+        return any(term in normalized_question for term in ("thay doi", "cap nhat", "dieu chinh", "khac truoc"))
+
+    def _references_explicitly_confirm_change(self, references: list[dict]) -> bool:
+        change_terms = ("thay doi", "cap nhat", "dieu chinh", "sua doi", "khong thay doi")
+        for reference in references:
+            normalized_excerpt = normalize_search_text(str(reference.get("excerpt") or ""))
+            if any(term in normalized_excerpt for term in change_terms):
+                return True
+        return False
+
+    def _format_reference_excerpt_for_answer(self, excerpt: str) -> str:
+        cleaned = re.sub(r"\s+", " ", str(excerpt or "")).strip()
+        return cleaned.rstrip(".")
+
+    def _build_grounded_public_answer(self, question: str, references: list[dict]) -> str:
+        answer_lines = [self._build_public_answer_intro(question), ""]
+
+        for reference in references[:2]:
+            excerpt = self._format_reference_excerpt_for_answer(str(reference.get("excerpt") or ""))
+            if not excerpt:
+                continue
+            answer_lines.append(f"- {reference['title']}: {excerpt}.")
+
+        if self._question_requests_change_verification(question) and not self._references_explicitly_confirm_change(references):
+            answer_lines.extend(
+                [
+                    "",
+                    "Chưa thấy tài liệu công khai trong các nguồn trên xác nhận có thay đổi. Bộ nguồn hiện tại chủ yếu cho biết phạm vi áp dụng và mốc thời gian hiệu lực.",
+                ]
+            )
+
+        answer_lines.extend(
+            [
+                "",
+                'Mở mục "Nguồn tài liệu" để kiểm tra số hiệu, thời gian hiệu lực và phạm vi áp dụng trước khi kết luận.',
+            ]
+        )
+
+        return "\n".join(line for line in answer_lines if line is not None).strip()
+
+    def _select_public_live_answer_content(
+        self,
+        question: str,
+        raw_response: str,
+        references: list[dict],
+        ranked_reference_documents: list[dict],
+    ) -> str:
+        top_document = ranked_reference_documents[0]["document"] if ranked_reference_documents else None
+        return (
+            self._build_temporal_validity_answer(question, top_document)
+            or raw_response
+            or self._build_grounded_public_answer(question, references)
+        )
+
     def _sanitize_lightrag_response_text(self, raw_response: str) -> str:
         cleaned_lines: list[str] = []
         for line in str(raw_response or "").splitlines():
             stripped = line.strip()
             normalized = normalize_search_text(stripped) if stripped else ""
             if "tai lieu tham khao" in normalized or normalized in {"reference", "references"}:
+                break
+            if "tai lieu da duoc sua doi" in normalized or "tinh minh bach" in normalized:
                 break
             if "admin-dashboard-public://" in line or "/uploads/" in line:
                 continue
@@ -1258,6 +1574,22 @@ class InMemoryWorkspaceService:
             flags=re.IGNORECASE,
         ).strip()
         cleaned = re.sub(r"(?:\n|\r\n)?---\s*$", "", cleaned).strip()
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return self._sanitize_chat_message_content(cleaned)
+
+    def _sanitize_chat_message_content(self, raw_content: str) -> str:
+        cleaned = str(raw_content or "").replace("\r\n", "\n").strip()
+        if not cleaned:
+            return ""
+
+        cleaned = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1", cleaned)
+        cleaned = re.sub(r"(?<!\*)\*\*(.+?)\*\*(?!\*)", r"\1", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"(?<!_)__(.+?)__(?!_)", r"\1", cleaned, flags=re.DOTALL)
+        cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+        cleaned = re.sub(r"^[ \t]*#{1,6}[ \t]*", "", cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r"^[ \t]*>[ \t]?", "", cleaned, flags=re.MULTILINE)
+        cleaned = cleaned.replace("**", "").replace("__", "")
+        cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
         cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
         return cleaned.strip()
 
@@ -1288,21 +1620,75 @@ class InMemoryWorkspaceService:
             and not document.get("system_metadata", {}).get("is_archived", False)
         )
 
-    def _build_public_workspace_document_text(self, document: dict) -> str:
+    def _build_document_index_excerpt(self, document: dict) -> str:
         temporal_metadata = document.get("temporal_metadata", {})
         supplemental_metadata = document.get("supplemental_metadata", {})
         traceability = document.get("traceability", {})
+
+        candidates: list[str] = []
+        seeded_excerpt = get_document_index_excerpt(str(document.get("id") or ""))
+        if seeded_excerpt:
+            candidates.append(seeded_excerpt)
+
+        notes = str(supplemental_metadata.get("notes") or "").strip()
+        if notes:
+            candidates.append(notes)
+
+        publication_reason = str(traceability.get("publication_reason") or "").strip()
+        if publication_reason:
+            candidates.append(publication_reason)
+
+        temporal_reasoning = str(temporal_metadata.get("temporal_reasoning") or "").strip()
+        if temporal_reasoning:
+            candidates.append(temporal_reasoning)
+
+        for version_entry in document.get("version_history", []):
+            change_summary = str(version_entry.get("change_summary") or "").strip()
+            if change_summary:
+                candidates.append(change_summary)
+            for highlight in version_entry.get("change_highlights", []):
+                highlight_text = str(highlight or "").strip()
+                if highlight_text:
+                    candidates.append(highlight_text)
+
+        seen: set[str] = set()
+        excerpt_blocks: list[str] = []
+        for candidate in candidates:
+            normalized_candidate = self._normalize_chat_text(candidate)
+            if not normalized_candidate or normalized_candidate in seen:
+                continue
+            seen.add(normalized_candidate)
+            excerpt_blocks.append(candidate)
+            if len(excerpt_blocks) >= 4:
+                break
+
+        return "\n\n".join(excerpt_blocks)
+
+    def _build_public_workspace_document_text(self, document: dict) -> str:
+        temporal_metadata = document.get("temporal_metadata", {})
+        supplemental_metadata = document.get("supplemental_metadata", {})
+        excerpt = self._build_document_index_excerpt(document)
         lines = [
             f"Tiêu đề: {document['title']}",
-            f"Trạng thái công bố: {document.get('lifecycle_status')}",
-            f"Phạm vi hiển thị: {supplemental_metadata.get('visibility_scope')}",
         ]
+        if excerpt:
+            lines.append("Trích yếu nội dung:")
+            lines.append(excerpt)
+        lines.extend(
+            [
+                f"Trạng thái công bố: {document.get('lifecycle_status')}",
+                f"Phạm vi hiển thị: {supplemental_metadata.get('visibility_scope')}",
+            ]
+        )
         document_number = temporal_metadata.get("document_number")
         if document_number:
             lines.append(f"Số hiệu: {document_number}")
         issuing_unit = supplemental_metadata.get("issuing_unit")
         if issuing_unit:
             lines.append(f"Đơn vị ban hành: {issuing_unit}")
+        document_type = temporal_metadata.get("document_type")
+        if document_type:
+            lines.append(f"Loại tài liệu: {document_type}")
         academic_year = temporal_metadata.get("academic_year")
         if academic_year:
             lines.append(f"Năm học: {academic_year}")
@@ -1314,16 +1700,10 @@ class InMemoryWorkspaceService:
             lines.append(f"Hiệu lực: từ {valid_from}")
         cohort_years = temporal_metadata.get("cohort_years") or []
         if cohort_years:
-            lines.append(f"Các khóa liên quan: {', '.join(cohort_years)}")
+            lines.append(f"Khóa tuyển sinh liên quan: {', '.join(cohort_years)}")
         tags = supplemental_metadata.get("tags") or []
         if tags:
             lines.append(f"Nhãn: {', '.join(tags)}")
-        notes = str(supplemental_metadata.get("notes") or "").strip()
-        if notes:
-            lines.append(f"Ghi chú công khai: {notes}")
-        publication_reason = str(traceability.get("publication_reason") or "").strip()
-        if publication_reason:
-            lines.append(f"Lý do công bố: {publication_reason}")
         return "\n".join(lines)
 
     def _sync_public_workspace_document(self, document: dict) -> dict:
@@ -1573,17 +1953,7 @@ class InMemoryWorkspaceService:
         return self._remove_public_workspace_document(document["id"])
 
     def _build_public_catalog_chat_reply(self, question: str) -> dict:
-        matches = sorted(
-            (
-                {
-                    "document": document,
-                    "score": self._score_public_document_for_chat(document, question),
-                }
-                for document in self._list_public_chat_documents()
-            ),
-            key=lambda item: item["score"],
-            reverse=True,
-        )
+        matches = self._rank_documents_for_chat(self._list_public_chat_documents(), question)
 
         strong_matches = [item for item in matches if item["score"] >= 3.0]
         if not strong_matches:
@@ -1661,13 +2031,69 @@ class InMemoryWorkspaceService:
             "warnings": warnings,
         }
 
+    def _build_public_live_query(self, question: str) -> str:
+        return str(question or "").strip()
+        return "\n".join(
+            [
+                "Trả lời chỉ dựa trên ngữ cảnh đã truy xuất từ tài liệu công khai của UIT.",
+                "Phân biệt rõ giữa khóa tuyển sinh và năm học.",
+                "Nếu tài liệu nói áp dụng cho sinh viên khóa tuyển sinh 2024, 2025, 2026 thì phải nêu đúng như vậy.",
+                "Nếu không có thông tin về thay đổi, hãy nói rõ là chưa thấy tài liệu công khai nào xác nhận thay đổi.",
+                f"Câu hỏi: {question}",
+            ]
+        )
+
+    def _query_internal_live_chat_result(self, question: str, conversation: dict | None) -> dict:
+        conversation_history = self._build_chat_conversation_history(conversation)
+        if not settings.TEST_MODE:
+            result = get_internal_langgraph_client().query_text(
+                question,
+                conversation_history=conversation_history,
+                include_references=True,
+                include_chunk_content=True,
+                response_type="Multiple Paragraphs",
+            )
+            if not result.get("error"):
+                return result
+
+        return get_lightrag_client().query_text(
+            question,
+            conversation_history=conversation_history,
+            mode="mix",
+            include_references=True,
+            include_chunk_content=True,
+            response_type="Multiple Paragraphs",
+        )
+
+    def _query_public_live_chat_result(self, question: str, conversation: dict | None) -> dict:
+        conversation_history = self._build_chat_conversation_history(conversation)
+        if settings.LANGGRAPH_PUBLIC_ASSISTANT_ID and not settings.TEST_MODE:
+            result = get_public_langgraph_client().query_text(
+                question,
+                conversation_history=conversation_history,
+                include_references=True,
+                include_chunk_content=True,
+                response_type="Multiple Paragraphs",
+            )
+            if not result.get("error"):
+                return result
+
+        return get_public_lightrag_client().query_text(
+            question,
+            conversation_history=conversation_history,
+            mode="mix",
+            include_references=True,
+            include_chunk_content=True,
+            response_type="Multiple Paragraphs",
+        )
+
     def _should_use_live_chat(self, role: Role, scenario: str) -> bool:
         return settings.LIVE_INGESTION_MODE and role in {"teacher", "admin"} and scenario == "happy"
 
     def _should_use_public_live_chat(self, role: Role, scenario: str) -> bool:
         return (
             settings.LIVE_INGESTION_MODE
-            and bool(settings.LIGHTRAG_PUBLIC_URL)
+            and bool(settings.LIGHTRAG_PUBLIC_URL or settings.LANGGRAPH_PUBLIC_ASSISTANT_ID)
             and role in {"guest", "student"}
             and scenario == "happy"
         )
@@ -1689,6 +2115,9 @@ class InMemoryWorkspaceService:
     def _find_document_for_reference(self, file_path: str) -> dict | None:
         if not file_path:
             return None
+        href_document_id = self._extract_document_id_from_href(file_path)
+        if href_document_id:
+            return self.store.get_document_by_id(href_document_id)
         public_document_id = self._extract_document_id_from_public_source(file_path)
         if public_document_id:
             return self.store.get_document_by_id(public_document_id)
@@ -1703,6 +2132,9 @@ class InMemoryWorkspaceService:
                 return document
         return None
 
+    def _reference_file_path(self, reference: dict) -> str:
+        return normalize_reference_path(reference)
+
     def _status_label_for_reference_document(self, document: dict | None) -> str:
         if document is None:
             return "Indexed"
@@ -1713,8 +2145,58 @@ class InMemoryWorkspaceService:
             return "Archived"
         return "Pending review"
 
+    def _response_type_warning(
+        self,
+        response_type: str,
+        *,
+        public_surface: bool,
+    ) -> dict | None:
+        if response_type == "partial_answer":
+            return {
+                "code": "partial_answer",
+                "message": (
+                    "\u0110\u00e3 t\u00ecm th\u1ea5y ng\u1eef c\u1ea3nh li\u00ean quan, "
+                    "nh\u01b0ng c\u00e2u tr\u1ea3 l\u1eddi hi\u1ec7n m\u1edbi bao qu\u00e1t m\u1ed9t ph\u1ea7n th\u00f4ng tin."
+                ),
+            }
+        if response_type == "fallback":
+            return {
+                "code": "follow_up_recommended",
+                "message": (
+                    "\u1ee8ng d\u1ee5ng ch\u1ec9 x\u00e1c nh\u1eadn \u0111\u01b0\u1ee3c m\u1ed9t ph\u1ea7n ng\u1eef c\u1ea3nh. "
+                    + (
+                        "B\u1ea1n n\u00ean m\u1edf m\u1ee5c \"Ngu\u1ed3n t\u00e0i li\u1ec7u\" \u0111\u1ec3 \u0111\u1ed1i chi\u1ebfu th\u00eam."
+                        if public_surface
+                        else "B\u1ea1n n\u00ean \u0111\u1ed1i chi\u1ebfu th\u00eam v\u1edbi \u0111\u01a1n v\u1ecb ph\u1ee5 tr\u00e1ch."
+                    )
+                ),
+            }
+        return None
+
+    def _live_chat_confidence(
+        self,
+        response_type: str,
+        *,
+        reference_count: int,
+        no_context: bool,
+        public_surface: bool,
+    ) -> float:
+        if no_context or reference_count == 0:
+            return 0.34 if not public_surface else 0.48
+        if public_surface:
+            if response_type == "partial_answer":
+                return 0.62 if reference_count >= 2 else 0.56
+            if response_type == "fallback":
+                return 0.5
+            return 0.76 if reference_count >= 2 else 0.68
+        if response_type == "partial_answer":
+            return 0.66
+        if response_type == "fallback":
+            return 0.48
+        return 0.82
+
     def _build_live_reference(self, reference: dict) -> dict:
-        document = self._find_document_for_reference(str(reference.get("file_path") or ""))
+        document = self._find_document_for_reference(self._reference_file_path(reference))
         if document is not None:
             return {
                 "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
@@ -1722,6 +2204,15 @@ class InMemoryWorkspaceService:
                 "href": f"/documents/{document['id']}",
                 "excerpt": "Nguồn được truy xuất từ cơ sở tri thức LightRAG và đã được ánh xạ về tài liệu nội bộ.",
                 "status_label": self._status_label_for_reference_document(document),
+            }
+        fallback_href = str(reference.get("href") or reference.get("url") or self._reference_file_path(reference) or "/documents")
+        if fallback_href.startswith(("http://", "https://")):
+            return {
+                "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
+                "title": str(reference.get("title") or "Nguồn tài liệu hệ thống"),
+                "href": fallback_href,
+                "excerpt": str(reference.get("excerpt") or "Nguồn được trích trực tiếp từ câu trả lời live."),
+                "status_label": "Indexed",
             }
         return {
             "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
@@ -1732,7 +2223,7 @@ class InMemoryWorkspaceService:
         }
 
     def _build_public_live_reference(self, reference: dict) -> dict:
-        document = self._find_document_for_reference(str(reference.get("file_path") or ""))
+        document = self._find_document_for_reference(self._reference_file_path(reference))
         if document is not None:
             return {
                 "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
@@ -1740,6 +2231,15 @@ class InMemoryWorkspaceService:
                 "href": f"/documents/{document['id']}",
                 "excerpt": self._build_public_reference_excerpt(document),
                 "status_label": self._status_label_for_reference_document(document),
+            }
+        fallback_href = str(reference.get("href") or reference.get("url") or self._reference_file_path(reference) or "/documents")
+        if fallback_href.startswith(("http://", "https://")):
+            return {
+                "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
+                "title": str(reference.get("title") or "Tài liệu công khai UIT"),
+                "href": fallback_href,
+                "excerpt": str(reference.get("excerpt") or "Nguồn được trích trực tiếp từ câu trả lời live của UIT AI."),
+                "status_label": "Approved",
             }
         return {
             "id": str(reference.get("reference_id") or f"ref-{uuid4().hex[:8]}"),
@@ -1749,38 +2249,54 @@ class InMemoryWorkspaceService:
             "status_label": "Approved",
         }
 
-    def _build_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
+    def _build_live_chat_reply_legacy(self, question: str, conversation: dict | None) -> dict:
         self._ensure_internal_workspace_seeded()
         self._wait_for_internal_workspace_ready()
-        result = get_lightrag_client().query_text(
-            question,
-            conversation_history=self._build_chat_conversation_history(conversation),
-            mode="mix",
-            include_references=True,
-            include_chunk_content=False,
-            response_type="Multiple Paragraphs",
-        )
+        result = self._query_internal_live_chat_result(question, conversation)
         if result.get("error"):
-            self._raise(502, "lightrag_query_failed", "Live chat query failed while generating the answer.")
+            self._raise(502, "live_query_failed", "Live chat query failed while generating the answer.")
 
-        raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
-        references = [self._build_live_reference(reference) for reference in result.get("references") or []]
-        no_context = "no relevant context found" in raw_response.lower() or not raw_response
+        normalized = normalize_chat_result(result)
+        raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+        references = [self._build_live_reference(reference) for reference in normalized.references]
+        no_context = normalized.no_context or not references
         if no_context or not references:
             self._force_internal_workspace_reseed()
-            result = get_lightrag_client().query_text(
-                question,
-                conversation_history=self._build_chat_conversation_history(conversation),
-                mode="mix",
-                include_references=True,
-                include_chunk_content=False,
-                response_type="Multiple Paragraphs",
-            )
+            result = self._query_internal_live_chat_result(question, conversation)
             if result.get("error"):
-                self._raise(502, "lightrag_query_failed", "Live chat query failed while generating the answer.")
-            raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
-            references = [self._build_live_reference(reference) for reference in result.get("references") or []]
-            no_context = "no relevant context found" in raw_response.lower() or not raw_response
+                self._raise(502, "live_query_failed", "Live chat query failed while generating the answer.")
+            normalized = normalize_chat_result(result)
+            raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+            references = [self._build_live_reference(reference) for reference in normalized.references]
+            no_context = normalized.no_context or not references
+        references, ranked_reference_documents = self._filter_references_for_chat(references, question)
+        if no_context or not self._references_have_strong_grounding(ranked_reference_documents, question):
+            return self._build_low_grounding_chat_reply(
+                question,
+                references,
+                public_surface=False,
+                ranked_reference_documents=ranked_reference_documents,
+            )
+        warnings: list[dict] = []
+        response_type_warning = self._response_type_warning(normalized.response_type, public_surface=False)
+        if response_type_warning is not None:
+            warnings.append(response_type_warning)
+        top_document = ranked_reference_documents[0]["document"] if ranked_reference_documents else None
+        final_content = self._build_temporal_validity_answer(question, top_document) or raw_response
+        if False:
+            warnings.append(
+                {
+                    "code": "low_confidence",
+                    "message": (
+                        "\u0110\u1ed9 tin c\u1eady \u0111ang th\u1ea5p v\u00ec truy v\u1ea5n live "
+                        "ch\u01b0a tr\u1ea3 v\u1ec1 ngu\u1ed3n tham chi\u1ebfu \u0111\u1ee7 ch\u1eafc ch\u1eafn."
+                    ),
+                }
+            )
+        else:
+            response_type_warning = self._response_type_warning(normalized.response_type, public_surface=False)
+            if response_type_warning is not None:
+                warnings.append(response_type_warning)
         return {
             "id": f"msg-{uuid4().hex[:8]}",
             "role": "assistant",
@@ -1790,59 +2306,226 @@ class InMemoryWorkspaceService:
                 else raw_response
             ),
             "created_at": utc_now_iso(),
-            "confidence": 0.34 if no_context or not references else 0.82,
-            "references": references,
-            "warnings": (
-                [{"code": "low_confidence", "message": "Độ tin cậy đang thấp vì truy vấn live chưa trả về nguồn tham chiếu đủ chắc chắn."}]
-                if no_context or not references
-                else []
+            "confidence": self._live_chat_confidence(
+                normalized.response_type,
+                reference_count=len(references),
+                no_context=no_context,
+                public_surface=False,
             ),
+            "references": references,
+            "warnings": warnings,
         }
 
-    def _build_public_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
+    def _build_public_live_chat_reply_legacy(self, question: str, conversation: dict | None) -> dict:
         self._ensure_public_workspace_seeded()
         self._wait_for_public_workspace_ready()
+        retrieval_query = question
         result = get_public_lightrag_client().query_text(
-            question,
+            retrieval_query,
             conversation_history=self._build_chat_conversation_history(conversation),
             mode="mix",
             include_references=True,
-            include_chunk_content=False,
+            include_chunk_content=True,
             response_type="Multiple Paragraphs",
         )
         if result.get("error"):
             return self._build_public_catalog_chat_reply(question)
 
-        raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
-        references = [self._build_public_live_reference(reference) for reference in result.get("references") or []]
-        no_context = "no relevant context found" in raw_response.lower() or not raw_response
-        if no_context or not references:
+        normalized = normalize_chat_result(result)
+        raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+        references = [self._build_public_live_reference(reference) for reference in normalized.references]
+        no_context = normalized.no_context or not references
+        if no_context:
             self._force_public_workspace_reseed()
             result = get_public_lightrag_client().query_text(
-                question,
+                retrieval_query,
                 conversation_history=self._build_chat_conversation_history(conversation),
                 mode="mix",
                 include_references=True,
-                include_chunk_content=False,
+                include_chunk_content=True,
                 response_type="Multiple Paragraphs",
             )
             if result.get("error"):
                 return self._build_public_catalog_chat_reply(question)
 
-            raw_response = self._sanitize_lightrag_response_text(str(result.get("response") or ""))
-            references = [self._build_public_live_reference(reference) for reference in result.get("references") or []]
-            no_context = "no relevant context found" in raw_response.lower() or not raw_response
-            if no_context or not references:
+            normalized = normalize_chat_result(result)
+            raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+            references = [self._build_public_live_reference(reference) for reference in normalized.references]
+            no_context = normalized.no_context or not references
+            if no_context:
                 return self._build_public_catalog_chat_reply(question)
+
+        references, ranked_reference_documents = self._filter_references_for_chat(references, question)
+        has_trusted_external_answer = self._has_trusted_external_live_answer(
+            response_type=normalized.response_type,
+            raw_response=raw_response,
+            references=references,
+        )
+        if (
+            not has_trusted_external_answer
+            and not self._references_have_strong_grounding(ranked_reference_documents, question)
+        ):
+            return self._build_low_grounding_chat_reply(
+                question,
+                references,
+                public_surface=True,
+                ranked_reference_documents=ranked_reference_documents,
+            )
+
+        warnings: list[dict] = []
+        response_type_warning = self._response_type_warning(normalized.response_type, public_surface=True)
+        if response_type_warning is not None:
+            warnings.append(response_type_warning)
+
+        final_content = (
+            raw_response
+            if has_trusted_external_answer
+            else self._select_public_live_answer_content(
+                question,
+                raw_response,
+                references,
+                ranked_reference_documents,
+            )
+        )
 
         return {
             "id": f"msg-{uuid4().hex[:8]}",
             "role": "assistant",
-            "content": raw_response,
+            "content": final_content,
             "created_at": utc_now_iso(),
-            "confidence": 0.8,
+            "confidence": self._live_chat_confidence(
+                normalized.response_type,
+                reference_count=len(references),
+                no_context=False,
+                public_surface=True,
+            ),
             "references": references,
-            "warnings": [],
+            "warnings": warnings,
+        }
+
+    def _build_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
+        self._ensure_internal_workspace_seeded()
+        self._wait_for_internal_workspace_ready()
+        result = self._query_internal_live_chat_result(question, conversation)
+        if result.get("error"):
+            self._raise(502, "live_query_failed", "Live chat query failed while generating the answer.")
+
+        normalized = normalize_chat_result(result)
+        raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+        references = [self._build_live_reference(reference) for reference in normalized.references]
+        no_context = normalized.no_context or not references
+        if no_context:
+            self._force_internal_workspace_reseed()
+            result = self._query_internal_live_chat_result(question, conversation)
+            if result.get("error"):
+                self._raise(502, "live_query_failed", "Live chat query failed while generating the answer.")
+            normalized = normalize_chat_result(result)
+            raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+            references = [self._build_live_reference(reference) for reference in normalized.references]
+            no_context = normalized.no_context or not references
+
+        references, ranked_reference_documents = self._filter_references_for_chat(references, question)
+        if no_context or not self._references_have_strong_grounding(ranked_reference_documents, question):
+            return self._build_low_grounding_chat_reply(
+                question,
+                references,
+                public_surface=False,
+                ranked_reference_documents=ranked_reference_documents,
+            )
+
+        warnings: list[dict] = []
+        response_type_warning = self._response_type_warning(normalized.response_type, public_surface=False)
+        if response_type_warning is not None:
+            warnings.append(response_type_warning)
+
+        top_document = ranked_reference_documents[0]["document"] if ranked_reference_documents else None
+        final_content = self._build_temporal_validity_answer(question, top_document) or raw_response
+
+        return {
+            "id": f"msg-{uuid4().hex[:8]}",
+            "role": "assistant",
+            "content": final_content,
+            "created_at": utc_now_iso(),
+            "confidence": self._live_chat_confidence(
+                normalized.response_type,
+                reference_count=len(references),
+                no_context=False,
+                public_surface=False,
+            ),
+            "references": references,
+            "warnings": warnings,
+        }
+
+    def _build_public_live_chat_reply(self, question: str, conversation: dict | None) -> dict:
+        self._ensure_public_workspace_seeded()
+        self._wait_for_public_workspace_ready()
+        result = self._query_public_live_chat_result(question, conversation)
+        if result.get("error"):
+            return self._build_public_catalog_chat_reply(question)
+
+        normalized = normalize_chat_result(result)
+        raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+        references = [self._build_public_live_reference(reference) for reference in normalized.references]
+        no_context = normalized.no_context or not references
+        if no_context:
+            self._force_public_workspace_reseed()
+            result = self._query_public_live_chat_result(question, conversation)
+            if result.get("error"):
+                return self._build_public_catalog_chat_reply(question)
+
+            normalized = normalize_chat_result(result)
+            raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+            references = [self._build_public_live_reference(reference) for reference in normalized.references]
+            no_context = normalized.no_context or not references
+            if no_context:
+                return self._build_public_catalog_chat_reply(question)
+
+        references, ranked_reference_documents = self._filter_references_for_chat(references, question)
+        has_trusted_external_answer = self._has_trusted_external_live_answer(
+            response_type=normalized.response_type,
+            raw_response=raw_response,
+            references=references,
+        )
+        if (
+            not has_trusted_external_answer
+            and not self._references_have_strong_grounding(ranked_reference_documents, question)
+        ):
+            return self._build_low_grounding_chat_reply(
+                question,
+                references,
+                public_surface=True,
+                ranked_reference_documents=ranked_reference_documents,
+            )
+
+        warnings: list[dict] = []
+        response_type_warning = self._response_type_warning(normalized.response_type, public_surface=True)
+        if response_type_warning is not None:
+            warnings.append(response_type_warning)
+
+        final_content = (
+            raw_response
+            if has_trusted_external_answer
+            else self._select_public_live_answer_content(
+                question,
+                raw_response,
+                references,
+                ranked_reference_documents,
+            )
+        )
+
+        return {
+            "id": f"msg-{uuid4().hex[:8]}",
+            "role": "assistant",
+            "content": final_content,
+            "created_at": utc_now_iso(),
+            "confidence": self._live_chat_confidence(
+                normalized.response_type,
+                reference_count=len(references),
+                no_context=False,
+                public_surface=True,
+            ),
+            "references": references,
+            "warnings": warnings,
         }
 
     def _get_lightrag_health_snapshot(self) -> dict:
@@ -1896,6 +2579,130 @@ class InMemoryWorkspaceService:
             }
         )
 
+    def _build_persisted_live_chat_reply(
+        self,
+        question: str,
+        result: dict,
+        *,
+        public_surface: bool,
+    ) -> dict:
+        normalized = normalize_chat_result(result)
+        raw_response = self._sanitize_lightrag_response_text(normalized.response_text)
+        references = [
+            self._build_public_live_reference(reference) if public_surface else self._build_live_reference(reference)
+            for reference in normalized.references
+        ]
+        no_context = normalized.no_context
+        has_references = bool(references)
+
+        if public_surface and no_context:
+            return self._build_public_catalog_chat_reply(question)
+
+        references, ranked_reference_documents = self._filter_references_for_chat(references, question)
+        has_strong_grounding = self._references_have_strong_grounding(ranked_reference_documents, question)
+        weak_grounding = (not has_references) or (not has_strong_grounding)
+        preserve_live_answer = bool(raw_response) and not no_context
+
+        if (no_context or weak_grounding) and not preserve_live_answer:
+            return self._build_low_grounding_chat_reply(
+                question,
+                references,
+                public_surface=public_surface,
+                ranked_reference_documents=ranked_reference_documents,
+            )
+
+        warnings: list[dict] = []
+        response_type_warning = self._response_type_warning(normalized.response_type, public_surface=public_surface)
+        if response_type_warning is not None:
+            warnings.append(response_type_warning)
+
+        if weak_grounding:
+            # The live stream has already produced an answer; keep it visible and
+            # surface the grounding weakness as a warning instead of replacing the
+            # answer with a generic fallback summary.
+            warnings.append(
+                {
+                    "code": "insufficient_grounding",
+                    "message": (
+                        "Nguon truy xuat hien moi dung o muc lien quan, chua du manh de xac nhan truc tiep cau tra loi."
+                    ),
+                }
+            )
+            final_content = raw_response
+            confidence = 0.52 if public_surface else 0.46
+        else:
+            if public_surface:
+                final_content = self._select_public_live_answer_content(
+                    question,
+                    raw_response,
+                    references,
+                    ranked_reference_documents,
+                )
+            else:
+                top_document = ranked_reference_documents[0]["document"] if ranked_reference_documents else None
+                final_content = self._build_temporal_validity_answer(question, top_document) or raw_response
+            confidence = self._live_chat_confidence(
+                normalized.response_type,
+                reference_count=len(references),
+                no_context=False,
+                public_surface=public_surface,
+            )
+
+        return {
+            "id": f"msg-{uuid4().hex[:8]}",
+            "role": "assistant",
+            "content": final_content,
+            "created_at": utc_now_iso(),
+            "confidence": confidence,
+            "references": references,
+            "warnings": warnings,
+        }
+
+    def persist_live_chat_message(
+        self,
+        payload: dict,
+        scenario: str,
+        role: Role = "guest",
+        session: dict | None = None,
+        session_token: str | None = None,
+    ) -> dict:
+        del scenario
+
+        question = str(payload.get("message") or "").strip() or "Bạn có thể nói rõ hơn yêu cầu không?"
+        raw_result = payload.get("result")
+        if not isinstance(raw_result, dict) or not raw_result:
+            self._raise(422, "live_result_invalid", "Live stream result is missing or invalid.")
+
+        conversation_id = payload.get("conversationId") or f"conv-{uuid4().hex[:8]}"
+        owner_key = self._conversation_owner_key(role, session, session_token)
+        owner_aliases = self._conversation_owner_aliases(role, session, session_token)
+        raw_conversation = self.store.get_conversation_by_id(conversation_id)
+        if raw_conversation is not None:
+            raw_conversation = self._ensure_conversation_owner(raw_conversation, owner_key, owner_aliases)
+        if raw_conversation is not None and not self._conversation_visible_to_owner(raw_conversation, owner_key, owner_aliases):
+            self._raise(404, "conversation_not_found", "Không tìm thấy cuộc trò chuyện.")
+
+        reply = self._build_persisted_live_chat_reply(
+            question,
+            raw_result,
+            public_surface=not self._is_document_admin(role),
+        )
+        reply = {**reply, "content": self._sanitize_chat_message_content(reply.get("content", ""))}
+        self._upsert_chat_conversation(conversation_id, question, reply, raw_conversation, owner_key)
+
+        if self._is_document_admin(role):
+            return {"conversation_id": conversation_id, "message": reply}
+
+        return {
+            "conversation_id": conversation_id,
+            "message": {
+                **reply,
+                "references": [
+                    self._redact_reference_for_public_surface(reference) for reference in reply.get("references", [])
+                ],
+            },
+        }
+
     def send_chat_message(
         self,
         payload: dict,
@@ -1918,13 +2725,32 @@ class InMemoryWorkspaceService:
             self._raise(404, "conversation_not_found", "Không tìm thấy cuộc trò chuyện.")
         existing_conversation = raw_conversation
         if self._should_use_live_chat(role, scenario):
-            reply = self._build_live_chat_reply(question, existing_conversation)
+            try:
+                reply = self._build_live_chat_reply(question, existing_conversation)
+            except ApiServiceError as exc:
+                if exc.status_code != 502:
+                    raise
+                fallback_reply = self._build_mock_chat_reply(question, scenario)
+                fallback_warnings = list(fallback_reply.get("warnings", []))
+                fallback_warnings.append(
+                    {
+                        "code": "live_backend_unavailable",
+                        "message": "Kho tri thuc live tam thoi chua san sang. /web dang tra ve phan hoi du phong de giao dien tiep tuc hoat dong.",
+                    }
+                )
+                reply = {
+                    **fallback_reply,
+                    "content": f'Kho tri thuc live tam thoi chua san sang. Dang tra ve phan hoi du phong. {fallback_reply["content"]}',
+                    "confidence": 0.24,
+                    "warnings": fallback_warnings,
+                }
         elif self._should_use_public_live_chat(role, scenario):
             reply = self._build_public_live_chat_reply(question, existing_conversation)
         elif self._should_use_public_catalog_chat(role, scenario):
             reply = self._build_public_catalog_chat_reply(question)
         else:
             reply = self._build_mock_chat_reply(question, scenario)
+        reply = {**reply, "content": self._sanitize_chat_message_content(reply.get("content", ""))}
         self._upsert_chat_conversation(conversation_id, question, reply, existing_conversation, owner_key)
         if self._is_document_admin(role):
             return {"conversation_id": conversation_id, "message": reply}

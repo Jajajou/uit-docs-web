@@ -40,7 +40,7 @@ def build_frontend_callback_url(
     auth_error: str | None = None,
     auth_error_message: str | None = None,
 ) -> str:
-    frontend_base_url = settings.SSO_FRONTEND_BASE_URL.rstrip("/")
+    frontend_base_url = settings.SSO_FRONTEND_BASE_URL.strip().rstrip("/")
     params: dict[str, str] = {}
     safe_return_to = normalize_return_to(return_to)
 

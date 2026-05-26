@@ -1,20 +1,22 @@
 import { expect, test } from '@playwright/test'
-import { setStoredRole } from './helpers'
+import { loginAsRole, setStoredRole } from './helpers'
 
-test('guest is blocked from admin routes', async ({ page }) => {
-    await setStoredRole(page, 'guest')
-    await page.goto('/admin/users')
+test('student is blocked from manager routes', async ({ page }) => {
+    await setStoredRole(page, 'student')
+    await page.goto('/manager')
 
     await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
 })
 
-test('admin can search the users page and access the admin shell', async ({ page }) => {
-    await setStoredRole(page, 'admin')
-    await page.goto('/admin/users')
+test('admin can search, filter and review users from the manager shell', async ({ page }) => {
+    await loginAsRole(page, 'admin', '/manager')
 
-    await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible()
-    await page.getByPlaceholder('Search by name or email...').fill('Invite Pending Lecturer')
-    await expect(page.getByText('Invite Pending Lecturer')).toBeVisible()
-    await page.goto('/admin/audit-logs?scenario=dense-audit-history')
-    await expect(page.getByRole('heading', { name: 'Audit logs', level: 1 })).toBeVisible()
+    await page.getByPlaceholder(/Tìm theo tên hoặc email/i).fill('admin@gm.uit.edu.vn')
+    await expect(page.getByText(/admin@gm.uit.edu.vn/i)).toBeVisible()
+
+    await page.getByLabel(/^Lọc người dùng theo vai trò$/i).click()
+    await page.locator('[role="listbox"]').first().getByRole('option', { name: /Quản trị viên/i }).click()
+
+    await expect(page.getByText(/Tran Van Admin/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /Lưu/i }).first()).toBeVisible()
 })

@@ -3,6 +3,15 @@ import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+const ignoredWorkspaceGlobs = [
+    '**/.playwright-cli/**',
+    '**/coverage/**',
+    '**/dist/**',
+    '**/test-results/**',
+    '**/tmp/**',
+    '**/tmp-vercel-preview/**',
+]
+
 function createManualChunks(id: string) {
     const normalizedId = id.replace(/\\/g, '/')
 
@@ -35,11 +44,12 @@ function createManualChunks(id: string) {
     }
 
     if (
-        normalizedId.includes('/react/') ||
-        normalizedId.includes('/react-dom/') ||
-        normalizedId.includes('react-router-dom') ||
-        normalizedId.includes('@remix-run/router') ||
-        normalizedId.includes('/scheduler/')
+        normalizedId.includes('/node_modules/react/') ||
+        normalizedId.includes('/node_modules/react-dom/') ||
+        normalizedId.includes('/node_modules/react-router/') ||
+        normalizedId.includes('/node_modules/react-router-dom/') ||
+        normalizedId.includes('/node_modules/@remix-run/router/') ||
+        normalizedId.includes('/node_modules/scheduler/')
     ) {
         return 'framework-vendor'
     }
@@ -69,13 +79,19 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
+            'eventemitter3': path.resolve(__dirname, './src/shared/lib/vendor/eventemitter3.ts'),
+            'is-network-error': path.resolve(__dirname, './src/shared/lib/vendor/isNetworkError.ts'),
+            'p-finally': path.resolve(__dirname, './src/shared/lib/vendor/pFinally.ts'),
         },
     },
     server: {
         port: 3000,
+        watch: {
+            ignored: ignoredWorkspaceGlobs,
+        },
         proxy: {
             '/api': {
-                target: 'http://127.0.0.1:8001',
+                target: 'http://127.0.0.1:8011',
                 changeOrigin: true,
             },
         },

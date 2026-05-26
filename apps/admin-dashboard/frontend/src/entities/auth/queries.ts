@@ -3,9 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { bootstrapSession, getSession, getSsoProviderMetadata, logoutSession } from '@/entities/auth/api'
 import { useSessionStore } from '@/entities/auth/store'
 import type { Role, Session } from '@/entities/auth/types'
+import { isMockAdapterEnabled } from '@/shared/api/mockRuntime'
 
 export function getSessionQueryKey(role: Role, scenario = 'happy') {
-    return ['auth', 'session', role, scenario] as const
+    if (isMockAdapterEnabled) {
+        return ['auth', 'session', role, scenario] as const
+    }
+
+    return ['auth', 'session', scenario] as const
 }
 
 export function useSessionQuery(params?: { scenario?: string; enabled?: boolean }) {
@@ -36,7 +41,7 @@ export function useBootstrapSessionMutation(params?: { scenario?: string }) {
         mutationFn: (role: Role) => bootstrapSession(role, params),
         onSuccess: (session: Session) => {
             useSessionStore.getState().setRole(session.user.role)
-            queryClient.removeQueries({ queryKey: ['auth', 'session'] })
+            queryClient.clear()
             queryClient.setQueryData(getSessionQueryKey(session.user.role, scenarioKey), session)
         },
     })
@@ -50,7 +55,7 @@ export function useLogoutSessionMutation() {
         onSuccess: () => {
             useSessionStore.getState().clearBootstrap()
             useSessionStore.getState().setRole('student')
-            queryClient.removeQueries({ queryKey: ['auth', 'session'] })
+            queryClient.clear()
         },
     })
 }

@@ -2,6 +2,7 @@ export const loadAppLayout = () => import('@/layouts/AppLayout')
 export const loadAuthLayout = () => import('@/layouts/AuthLayout')
 
 export const loadChatPage = () => import('@/pages/public/ChatPage')
+export const loadLibraryPage = () => import('@/pages/portal/LibraryPage')
 export const loadDocumentDetailPage = () => import('@/pages/public/DocumentDetailPage')
 
 export const loadLoginPage = () => import('@/pages/auth/LoginPage')
@@ -33,6 +34,11 @@ const routePreloaders: RoutePreloader[] = [
         key: 'app-chat',
         matches: (pathname) => pathname === '/' || pathname === '/chat',
         load: () => Promise.all([loadAppLayout(), loadChatPage()]),
+    },
+    {
+        key: 'app-documents',
+        matches: (pathname) => pathname === '/documents' || pathname === '/library',
+        load: () => Promise.all([loadAppLayout(), loadLibraryPage()]),
     },
     {
         key: 'app-upload',

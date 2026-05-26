@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { mapDocumentDtoToDocument } from '@/entities/documents/mappers'
-import { getDocumentTrustState } from '@/entities/documents/presentation'
+import {
+    formatStatusLabel,
+    getDocumentTrustState,
+    getLifecycleTone,
+    getProcessingTone,
+    getVisibilityTone,
+} from '@/entities/documents/presentation'
 import { documentFixtures } from '@/mocks/fixtures/documents'
 
 describe('document presentation helpers', () => {
@@ -44,5 +50,16 @@ describe('document presentation helpers', () => {
             tone: 'brand',
             title: 'Trusted internal source',
         })
+    })
+
+    it('formats document metadata labels and tones consistently', () => {
+        expect(formatStatusLabel('pending_review')).toBe('pending review')
+        expect(getLifecycleTone('approved')).toBe('success')
+        expect(getLifecycleTone('draft')).toBe('neutral')
+        expect(getProcessingTone('completed')).toBe('success')
+        expect(getProcessingTone('extracting')).toBe('brand')
+        expect(getProcessingTone('pending')).toBe('neutral')
+        expect(getVisibilityTone('public')).toBe('brand')
+        expect(getVisibilityTone('internal')).toBe('neutral')
     })
 })

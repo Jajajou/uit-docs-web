@@ -122,6 +122,12 @@ class ChatStreamRequest(StrictModel):
     message: str
 
 
+class ChatLiveSyncRequest(StrictModel):
+    conversationId: str | None = None
+    message: str
+    result: dict[str, Any]
+
+
 class DocumentTemporalMetadataDto(StrictModel):
     document_type: str
     extraction_method: str

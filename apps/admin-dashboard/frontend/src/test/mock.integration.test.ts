@@ -114,7 +114,7 @@ describe('mock contract integration', () => {
     })
 
     it('accepts document archive and reindex mutations through the shared contract', async () => {
-        useSessionStore.getState().setRole('operator')
+        useSessionStore.getState().setRole('admin')
 
         try {
             const archived = await archiveDocument('doc-001')
@@ -124,7 +124,7 @@ describe('mock contract integration', () => {
             expect(archived.system.isArchived).toBe(true)
             expect(reindexed.processingStatus).toBe('indexing')
         } finally {
-            useSessionStore.getState().setRole('guest')
+            useSessionStore.getState().setRole('student')
         }
     })
 
@@ -144,15 +144,14 @@ describe('mock contract integration', () => {
 
     it('accepts admin patch mutations through the shared contract', async () => {
         const updatedUser = await patchAdminUser('usr-005', {
-            role: 'operator',
+            role: 'teacher',
             status: 'active',
-            scope: 'operator_portal',
         })
         const updatedSetting = await patchSystemSetting('citation_policy', {
             value: 'Every student answer must cite an approved source.',
         })
 
-        expect(updatedUser.role).toBe('operator')
+        expect(updatedUser.role).toBe('teacher')
         expect(updatedUser.status).toBe('active')
         expect(updatedSetting.value).toContain('approved source')
     })
@@ -177,26 +176,26 @@ describe('mock contract integration', () => {
     })
 
     it('returns non-compliant internal email sessions for access-control testing', async () => {
-        useSessionStore.getState().setRole('lecturer')
+        useSessionStore.getState().setRole('teacher')
 
         try {
             const session = await getSession({ scenario: 'non-compliant-internal-email' })
 
-            expect(session.user.role).toBe('lecturer')
-            expect(session.user.email).toBe('lecturer@uit.edu.vn')
+            expect(session.user.role).toBe('teacher')
+            expect(session.user.email).toBe('teacher@gmail.com')
         } finally {
-            useSessionStore.getState().setRole('guest')
+            useSessionStore.getState().setRole('student')
         }
     })
 
     it('rejects non-compliant internal bootstrap attempts', async () => {
-        await expect(bootstrapSession('lecturer', { scenario: 'non-compliant-internal-email' })).rejects.toBeInstanceOf(ApiClientError)
+        await expect(bootstrapSession('teacher', { scenario: 'non-compliant-internal-email' })).rejects.toBeInstanceOf(ApiClientError)
     })
 
     it('surfaces non-compliant internal email scenario', async () => {
         const users = await getAdminUsers({ scenario: 'non-compliant-internal-email' })
 
-        expect(users.some((user) => user.role === 'lecturer' && !user.isInternalDomainCompliant)).toBe(true)
+        expect(users.some((user) => user.role === 'teacher' && !user.isInternalDomainCompliant)).toBe(true)
     })
 
     it('returns dense audit history scenario', async () => {

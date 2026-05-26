@@ -1,3 +1,5 @@
+export * from '@/shared/ui/composites/BrandLoadingAnimation'
+export * from '@/shared/ui/composites/BrandMark'
 export * from '@/shared/ui/composites/DataTable'
 export * from '@/shared/ui/composites/FilterBar'
 export * from '@/shared/ui/composites/MetadataPanel'

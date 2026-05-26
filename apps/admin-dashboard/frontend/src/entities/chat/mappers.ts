@@ -1,6 +1,8 @@
 import type {
     AnswerReference,
     AnswerWarning,
+    ChatResponse,
+    ChatResponseDto,
     Conversation,
     ConversationDto,
     Message,
@@ -42,5 +44,12 @@ export function mapConversationDto(dto: ConversationDto): Conversation {
         title: dto.title,
         updatedAt: dto.updated_at,
         messages: dto.messages.map(mapMessageDto),
+    }
+}
+
+export function mapChatResponseDto(dto: ChatResponseDto): ChatResponse {
+    return {
+        conversationId: dto.conversation_id,
+        message: mapMessageDto(dto.message),
     }
 }

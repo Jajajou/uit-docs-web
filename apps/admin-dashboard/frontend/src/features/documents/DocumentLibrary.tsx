@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen } from 'lucide-react'
+import { ArrowRight, BookOpen, FileSearch, Sparkles } from 'lucide-react'
+import { RouteIntentLink } from '@/app/router/RouteIntentLink'
 import { useDocumentsQuery } from '@/entities/documents/queries'
 import type { DocumentLifecycleStatus, VisibilityScope } from '@/entities/documents/types'
 import { formatDateTime } from '@/shared/lib/format'
@@ -35,6 +36,14 @@ const visibilityOptions = [
     { label: 'Công khai', value: 'public' },
     { label: 'Nội bộ', value: 'internal' },
 ]
+
+function normalizeSearchValue(value: string) {
+    return value
+        .replace(/[đĐ]/g, (character) => (character === 'Đ' ? 'D' : 'd'))
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+}
 
 function formatLifecycleLabel(status: DocumentLifecycleStatus) {
     return lifecycleLabelMap[status] ?? status
@@ -72,21 +81,23 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
     const deferredSearch = useDeferredValue(searchValue)
 
     const filteredDocuments = useMemo(() => {
-        const normalizedSearch = deferredSearch.trim().toLowerCase()
+        const normalizedSearch = normalizeSearchValue(deferredSearch.trim())
 
-        return (documentsQuery.data ?? []).filter((document) => {
-            const matchesSearch =
-                normalizedSearch.length === 0 ||
-                document.title.toLowerCase().includes(normalizedSearch) ||
-                document.supplemental.issuingUnit.toLowerCase().includes(normalizedSearch) ||
-                document.temporal.documentType.toLowerCase().includes(normalizedSearch)
+        return (documentsQuery.data ?? [])
+            .filter((document) => {
+                const matchesSearch =
+                    normalizedSearch.length === 0 ||
+                    normalizeSearchValue(document.title).includes(normalizedSearch) ||
+                    normalizeSearchValue(document.supplemental.issuingUnit).includes(normalizedSearch) ||
+                    normalizeSearchValue(document.temporal.documentType).includes(normalizedSearch)
 
-            const matchesLifecycle = lifecycleFilter === 'all' || document.lifecycleStatus === lifecycleFilter
-            const matchesVisibility =
-                visibilityFilter === 'all' || document.supplemental.visibilityScope === visibilityFilter
+                const matchesLifecycle = lifecycleFilter === 'all' || document.lifecycleStatus === lifecycleFilter
+                const matchesVisibility =
+                    visibilityFilter === 'all' || document.supplemental.visibilityScope === visibilityFilter
 
-            return matchesSearch && matchesLifecycle && matchesVisibility
-        })
+                return matchesSearch && matchesLifecycle && matchesVisibility
+            })
+            .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
     }, [deferredSearch, documentsQuery.data, lifecycleFilter, visibilityFilter])
 
     const documentCounts = documentsQuery.data ?? []
@@ -119,6 +130,57 @@ export function DocumentLibrary({ scenario }: { scenario?: string }) {
                     </div>
                 </Card>
             </div>
+
+            <Card className="overflow-hidden border-brand-100 bg-[radial-gradient(circle_at_top_left,_rgba(219,234,254,0.95),_rgba(255,255,255,0.98)_42%,_rgba(248,250,252,0.95)_100%)] dark:border-brand-900/70 dark:bg-[radial-gradient(circle_at_top_left,_rgba(12,74,110,0.48),_rgba(10,18,32,0.96)_42%,_rgba(8,15,28,0.98)_100%)]">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="space-y-3">
+                        <Badge tone="brand" className="w-fit">
+                            <Sparkles size={14} />
+                            Gợi ý thao tác nhanh
+                        </Badge>
+                        <div className="space-y-1.5">
+                            <h2 className="text-lg font-semibold text-gray-950 dark:text-white">Thu hẹp tài liệu trước, rồi hỏi tiếp trong chat khi cần đối chiếu.</h2>
+                            <p className="max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
+                                Bộ lọc ở đây phù hợp cho lúc bạn muốn rà nhanh văn bản mới nhất. Khi cần câu trả lời có dẫn nguồn,
+                                bạn có thể nhảy sang chat ngay mà vẫn giữ cùng ngữ cảnh tra cứu.
+                            </p>
+                        </div>
+                    </div>
+
+                    <RouteIntentLink
+                        to="/chat"
+                        className="inline-flex items-center justify-center gap-2 rounded-[1.2rem] border border-brand-200 bg-white/92 px-4 py-3 text-sm font-semibold text-brand-700 shadow-theme-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-theme-sm dark:border-brand-800 dark:bg-brand-950/35 dark:text-brand-200"
+                    >
+                        <FileSearch size={16} />
+                        Mở chat tham chiếu
+                        <ArrowRight size={16} />
+                    </RouteIntentLink>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setVisibilityFilter('public')}
+                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:border-brand-200 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-900/92 dark:text-gray-200 dark:hover:border-brand-800 dark:hover:text-brand-200"
+                    >
+                        Chỉ xem công khai
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setLifecycleFilter('approved')}
+                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:border-brand-200 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-900/92 dark:text-gray-200 dark:hover:border-brand-800 dark:hover:text-brand-200"
+                    >
+                        Đã duyệt
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setLifecycleFilter('pending_review')}
+                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/92 px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:border-brand-200 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-900/92 dark:text-gray-200 dark:hover:border-brand-800 dark:hover:text-brand-200"
+                    >
+                        Chờ rà soát
+                    </button>
+                </div>
+            </Card>
 
             <FilterBar
                 searchValue={searchValue}

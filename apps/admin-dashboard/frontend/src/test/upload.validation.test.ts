@@ -44,4 +44,47 @@ describe('upload draft validation', () => {
     it('deduplicates and trims tags', () => {
         expect(parseTagInput(' hoc-phi, sinh-vien, hoc-phi , ')).toEqual(['hoc-phi', 'sinh-vien'])
     })
+
+    it('requires a file when the source type is file', () => {
+        const result = validateUploadDraft({
+            ...baseValues,
+            fileCount: 0,
+        })
+
+        expect(result.success).toBe(false)
+
+        if (!result.success) {
+            expect(result.error.issues.some((issue) => issue.path[0] === 'fileCount')).toBe(true)
+        }
+    })
+
+    it('requires a valid source URL when the source type is url', () => {
+        const result = validateUploadDraft({
+            ...baseValues,
+            sourceType: 'url',
+            fileCount: 0,
+            url: 'not-a-valid-url',
+        })
+
+        expect(result.success).toBe(false)
+
+        if (!result.success) {
+            expect(result.error.issues.some((issue) => issue.path[0] === 'url')).toBe(true)
+        }
+    })
+
+    it('requires both ownership confirmations before review entry', () => {
+        const result = validateUploadDraft({
+            ...baseValues,
+            confirmOwnership: false,
+            confirmReviewReady: false,
+        })
+
+        expect(result.success).toBe(false)
+
+        if (!result.success) {
+            expect(result.error.issues.some((issue) => issue.path[0] === 'confirmOwnership')).toBe(true)
+            expect(result.error.issues.some((issue) => issue.path[0] === 'confirmReviewReady')).toBe(true)
+        }
+    })
 })

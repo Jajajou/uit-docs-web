@@ -1,6 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@200;300;400;500;600;700;800&display=swap") layer(base);
-
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "../../**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -189,21 +188,30 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--color-gray-300);
+  background: transparent;
   border-radius: 9999px;
   transition: background 0.2s;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar:hover {
+  scrollbar-color: var(--color-gray-300) transparent;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: var(--color-gray-400);
 }
 
@@ -317,6 +325,14 @@
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.dark .custom-scrollbar:hover {
+  scrollbar-color: rgba(94, 133, 184, 0.55) transparent;
+}
+
+.dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background: rgba(94, 133, 184, 0.55);
 }
 
