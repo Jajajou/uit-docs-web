@@ -344,48 +344,69 @@ function AssistantAnswerBody({ content }: { content: string }) {
     )
 }
 
-function CitationPreview({ reference, index }: { reference: AnswerReference; index: number }) {
+function CitationPreview({
+    reference,
+    index,
+    isOpen,
+    onToggle,
+}: {
+    reference: AnswerReference
+    index: number
+    isOpen: boolean
+    onToggle: () => void
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={`Nguồn ${index + 1}: ${reference.title}`}
+            aria-expanded={isOpen}
+            onClick={onToggle}
+            className={cn(
+                'inline-flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-[12px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/15',
+                isOpen
+                    ? 'border-brand-300 bg-brand-100 text-brand-800 dark:border-brand-700 dark:bg-brand-950/80 dark:text-brand-100'
+                    : 'border-brand-200 bg-brand-50/92 text-brand-700 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/50 dark:text-brand-200 dark:hover:border-brand-700 dark:hover:bg-brand-950/70',
+            )}
+        >
+            [{index + 1}]
+        </button>
+    )
+}
+
+function CitationDetailCard({ reference, index }: { reference: AnswerReference; index: number }) {
     const meta = getReferenceStatusMeta(reference.statusLabel)
 
     return (
-        <div className="group relative">
-            <button
-                type="button"
-                aria-label={`Nguồn ${index + 1}: ${reference.title}`}
-                className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-brand-200 bg-brand-50/92 px-3 text-[12px] font-semibold text-brand-700 transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/15 dark:border-brand-800 dark:bg-brand-950/50 dark:text-brand-200 dark:hover:border-brand-700 dark:hover:bg-brand-950/70"
-            >
-                [{index + 1}]
-            </button>
-
-            <div className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-3 w-[19rem] max-w-[calc(100vw-4rem)] translate-y-2 opacity-0 transition-all duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
-                <div className={cn('rounded-[1.45rem] border p-4 shadow-[0_26px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:shadow-[0_26px_90px_rgba(0,0,0,0.35)]', meta.cardClassName)}>
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{`Nguồn ${index + 1}`}</div>
-                            <div className="text-sm font-semibold text-gray-950 dark:text-white">{reference.title}</div>
-                        </div>
-                        <Badge tone={meta.tone}>{meta.label}</Badge>
-                    </div>
-
-                    <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{reference.excerpt}</p>
-
-                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/60 pt-3 text-xs dark:border-white/10">
-                        <span className="font-semibold uppercase tracking-[0.14em] text-gray-400">{getReferenceKindLabel(reference)}</span>
-                        <RouteIntentLink
-                            to={reference.href}
-                            className="inline-flex items-center gap-1.5 font-semibold text-brand-700 transition-colors hover:text-brand-800 dark:text-brand-200 dark:hover:text-brand-100"
-                        >
-                            {getReferenceActionLabel(reference)}
-                            <ArrowRight size={14} />
-                        </RouteIntentLink>
-                    </div>
+        <div className={cn('w-full rounded-[1.45rem] border p-4 shadow-[0_18px_48px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_52px_rgba(0,0,0,0.28)]', meta.cardClassName)}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{`Nguồn ${index + 1}`}</div>
+                    <div className="text-sm font-semibold text-gray-950 dark:text-white">{reference.title}</div>
                 </div>
+                <Badge tone={meta.tone}>{meta.label}</Badge>
+            </div>
+
+            <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{reference.excerpt}</p>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/60 pt-3 text-xs dark:border-white/10">
+                <span className="font-semibold uppercase tracking-[0.14em] text-gray-400">{getReferenceKindLabel(reference)}</span>
+                <RouteIntentLink
+                    to={reference.href}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 font-semibold text-brand-700 transition-colors hover:text-brand-800 dark:text-brand-200 dark:hover:text-brand-100"
+                >
+                    {getReferenceActionLabel(reference)}
+                    <ArrowRight size={14} />
+                </RouteIntentLink>
             </div>
         </div>
     )
 }
 
 function AssistantMessage({ message }: { message: Message }) {
+    const [openReferenceId, setOpenReferenceId] = useState<string | null>(null)
+    const openReferenceIndex = message.references.findIndex((reference) => reference.id === openReferenceId)
+    const openReference = openReferenceIndex >= 0 ? message.references[openReferenceIndex] : null
+
     return (
         <div className="flex gap-4">
             <BrandMark className="mt-1 h-11 w-11 shrink-0 rounded-2xl" />
@@ -403,10 +424,21 @@ function AssistantMessage({ message }: { message: Message }) {
                             <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">Nguồn</span>
                             <div className="flex flex-wrap items-center gap-2">
                                 {message.references.map((reference, index) => (
-                                    <CitationPreview key={reference.id} reference={reference} index={index} />
+                                    <CitationPreview
+                                        key={reference.id}
+                                        reference={reference}
+                                        index={index}
+                                        isOpen={openReferenceId === reference.id}
+                                        onToggle={() => setOpenReferenceId((current) => (current === reference.id ? null : reference.id))}
+                                    />
                                 ))}
                             </div>
-                            <span className="text-xs text-gray-400">Bấm vào [1] để xem trích đoạn và mở hồ sơ gốc.</span>
+                            <span className="text-xs text-gray-400">Bấm vào [1] để mở trích đoạn ngay trong câu trả lời, không che nội dung.</span>
+                            {openReference ? (
+                                <div className="basis-full pt-2">
+                                    <CitationDetailCard reference={openReference} index={openReferenceIndex} />
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -1538,8 +1570,12 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                                 className="custom-scrollbar flex-1 overflow-y-auto pb-10"
                             >
                                 <div className="space-y-6 pb-8">
-                                    {displayedMessagesWithPreview.map((message) =>
-                                        message.role === 'assistant' ? <AssistantMessage key={message.id} message={message} /> : <UserMessage key={message.id} message={message} />,
+                                    {displayedMessagesWithPreview.map((message, index) =>
+                                        message.role === 'assistant' ? (
+                                            <AssistantMessage key={`${message.id}-${message.role}-${message.createdAt}-${index}`} message={message} />
+                                        ) : (
+                                            <UserMessage key={`${message.id}-${message.role}-${message.createdAt}-${index}`} message={message} />
+                                        ),
                                     )}
 
                                     {isResponding && !streamingAssistantMessage ? <TypingIndicator /> : null}
