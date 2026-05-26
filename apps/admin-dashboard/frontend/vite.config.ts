@@ -74,15 +74,32 @@ function createManualChunks(id: string) {
     return 'vendor'
 }
 
+const eventemitter3StubPath = path.resolve(__dirname, './src/shared/lib/vendor/eventemitter3.ts')
+
+function selectiveVendorAlias(): import('vite').Plugin {
+    return {
+        name: 'selective-vendor-alias',
+        enforce: 'pre',
+        resolveId(id, importer) {
+            // Skip stub aliases for @langchain/* — they use real eventemitter3
+            if (importer?.includes('node_modules/@langchain')) return null
+            if (id === 'eventemitter3') return eventemitter3StubPath
+            return null
+        },
+    }
+}
+
 export default defineConfig({
-    plugins: [react(), tailwindcss()],
+    plugins: [selectiveVendorAlias(), react(), tailwindcss()],
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
-            'eventemitter3': path.resolve(__dirname, './src/shared/lib/vendor/eventemitter3.ts'),
             'is-network-error': path.resolve(__dirname, './src/shared/lib/vendor/isNetworkError.ts'),
             'p-finally': path.resolve(__dirname, './src/shared/lib/vendor/pFinally.ts'),
         },
+    },
+    optimizeDeps: {
+        include: ['@langchain/langgraph-sdk', '@langchain/langgraph-sdk > eventemitter3'],
     },
     server: {
         port: 3000,
