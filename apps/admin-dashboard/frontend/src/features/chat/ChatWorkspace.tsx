@@ -691,7 +691,7 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
     const selectedRole = useSessionStore((state) => state.selectedRole)
     const theme = useThemeStore((state) => state.theme)
     const toggleTheme = useThemeStore((state) => state.toggleTheme)
-    const liveStreamConfig = useMemo(() => getLangGraphStreamConfig(), [])
+    const liveStreamConfig = useMemo(() => getLangGraphStreamConfig(selectedRole ?? undefined), [selectedRole])
 
     const [selectedConversationId, setSelectedConversationId] = useState('')
     const [canvasMode, setCanvasMode] = useState<ChatCanvasMode>('fresh')
@@ -707,6 +707,10 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
     const [isLiveTransportAvailable, setIsLiveTransportAvailable] = useState<boolean | null>(
         liveStreamConfig.enabled ? null : false,
     )
+    const [studentContextForm, setStudentContextForm] = useState<{ cohortYear: string; eduSystem: string }>({
+        cohortYear: '',
+        eduSystem: 'chinh_quy',
+    })
 
     const deferredConversationSearch = useDeferredValue(conversationSearch)
     const messagesViewportRef = useRef<HTMLDivElement | null>(null)
@@ -1536,6 +1540,49 @@ export function ChatWorkspace({ scenario }: { scenario?: string }) {
                                     )}
 
                                     {isResponding && !streamingAssistantMessage ? <TypingIndicator /> : null}
+
+                                    {(() => {
+                                        const interrupt = liveStream.interrupt as { value?: { action?: string; message?: string } } | undefined
+                                        if (!interrupt?.value || interrupt.value.action !== 'request_context') return null
+                                        return (
+                                            <Card className="mx-auto max-w-[38rem] p-4 my-3 border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40">
+                                                <p className="mb-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+                                                    {interrupt.value.message ?? 'Vui lòng cung cấp thêm thông tin để trả lời chính xác hơn.'}
+                                                </p>
+                                                <div className="flex flex-col gap-2 mb-3">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Năm nhập học (ví dụ: 2022)"
+                                                        value={studentContextForm.cohortYear}
+                                                        onChange={(e) => setStudentContextForm((prev) => ({ ...prev, cohortYear: e.target.value }))}
+                                                    />
+                                                    <select
+                                                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+                                                        value={studentContextForm.eduSystem}
+                                                        onChange={(e) => setStudentContextForm((prev) => ({ ...prev, eduSystem: e.target.value }))}
+                                                    >
+                                                        <option value="chinh_quy">Chính quy</option>
+                                                        <option value="lien_thong">Liên thông</option>
+                                                        <option value="tu_xa">Từ xa</option>
+                                                        <option value="tien_tien">Tiên tiến</option>
+                                                    </select>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    disabled={!studentContextForm.cohortYear}
+                                                    onClick={() => {
+                                                        void liveStream.submit({
+                                                            cohort_year: Number(studentContextForm.cohortYear),
+                                                            education_system: studentContextForm.eduSystem,
+                                                        })
+                                                    }}
+                                                >
+                                                    Tiếp tục
+                                                </Button>
+                                            </Card>
+                                        )
+                                    })()}
+
                                     <div ref={messageEndRef} />
                                 </div>
                             </div>

@@ -235,10 +235,11 @@ export function resolveLangGraphStreamConfig(env: {
     }
 }
 
-export function getLangGraphStreamConfig() {
+export function getLangGraphStreamConfig(role?: string) {
     const config = resolveLangGraphStreamConfig(import.meta.env as Record<string, unknown>)
     const origin = typeof window === 'undefined' ? undefined : window.location.origin
-    const apiUrl = resolveRuntimeAbsoluteUrl(config.apiUrl, origin)
+    const resolvedApiUrl = role === 'student' ? '/api/student' : config.apiUrl
+    const apiUrl = resolveRuntimeAbsoluteUrl(resolvedApiUrl, origin)
     const transport = createLangGraphStreamTransport(apiUrl, config.assistantId, origin)
 
     if (!origin) {
