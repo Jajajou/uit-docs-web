@@ -23,24 +23,50 @@ EXACT_TEXT_REPLACEMENTS = {
     "Thong bao hoc bong doanh nghiep": "Thông báo học bổng doanh nghiệp",
     "Quy dinh hoc vu": "Quy định học vụ",
     "Thu thap thong bao cong khai UIT": "Thu thập thông báo công khai UIT",
-    "Da duoc duyet tu phieu nop sub-002 va du dieu kien dung trong cau tra loi danh cho sinh vien.": "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong câu trả lời dành cho sinh viên.",
-    "Duoc duyet cho kenh chat sinh vien sau khi xac minh khoang thoi gian hieu luc.": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
+    "Da duoc duyet tu phieu nop sub-002 va du dieu kien dung trong cau tra loi danh cho sinh vien.": (
+        "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong "
+        "câu trả lời dành cho sinh viên."
+    ),
+    "Duoc duyet cho kenh chat sinh vien sau khi xac minh khoang thoi gian hieu luc.": (
+        "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực."
+    ),
     "Detected valid range and academic year from section 1 and 2.": "Đã xác định phạm vi hiệu lực và năm học từ mục 1 và mục 2.",
-    "Found fee semester pattern but no explicit valid_until date.": "Đã phát hiện mẫu học phí theo học kỳ nhưng chưa có ngày hết hiệu lực rõ ràng.",
+    "Found fee semester pattern but no explicit valid_until date.": (
+        "Đã phát hiện mẫu học phí theo học kỳ nhưng chưa có ngày hết hiệu lực rõ ràng."
+    ),
     "No date found. Document kept as archived reference only.": "Không tìm thấy ngày cụ thể. Tài liệu được giữ lại như tài liệu lưu trữ để tra cứu.",
     "Date ranges extracted from heading and bulletin footer.": "Khoảng thời gian được trích từ tiêu đề và chân thông báo.",
     "Archived after new scholarship bulletin superseded it.": "Đã lưu trữ sau khi có thông báo học bổng mới thay thế.",
-    "Rejected because the uploaded source does not include an official bulletin body or issue number.": "Từ chối vì nguồn tải lên không có nội dung thông báo chính thức hoặc số hiệu văn bản.",
+    "Rejected because the uploaded source does not include an official bulletin body or issue number.": (
+        "Từ chối vì nguồn tải lên không có nội dung thông báo chính thức hoặc số hiệu văn bản."
+    ),
     "Displayed in public assistant results.": "Được hiển thị trong kết quả trả lời công khai.",
     "Clarified cohort coverage for 2024 intake.": "Làm rõ phạm vi áp dụng cho khóa tuyển sinh 2024.",
-    "Updated indexed provenance after operator review.": "Cập nhật nguồn gốc chỉ mục sau khi điều phối viên rà soát.",
-    "Initial upload snapshot before operator confirmation.": "Bản chụp ban đầu của lần tải lên trước khi điều phối viên xác nhận.",
-    "Initial lecturer snapshot before operator confirmation.": "Bản chụp ban đầu do giảng viên cung cấp trước khi điều phối viên xác nhận.",
-    "Approved revision with clarified cohort range and indexing provenance.": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và nguồn gốc chỉ mục.",
-    "Approved revision with clarified cohort range and updated indexing provenance.": "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và cập nhật nguồn gốc chỉ mục.",
-    "Reviewed publication dates and enrollment timeline from the official source page.": "Đã rà soát ngày công bố và mốc thời gian đăng ký từ trang nguồn chính thức.",
-    "Approved from submission sub-002 and now eligible for student-facing assistant answers.": "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong câu trả lời dành cho sinh viên.",
-    "Approved for public student-facing chat after date range verification.": "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực.",
+    "Updated indexed provenance after operator review.": (
+        "Cập nhật nguồn gốc chỉ mục sau khi điều phối viên rà soát."
+    ),
+    "Initial upload snapshot before operator confirmation.": (
+        "Bản chụp ban đầu của lần tải lên trước khi điều phối viên xác nhận."
+    ),
+    "Initial lecturer snapshot before operator confirmation.": (
+        "Bản chụp ban đầu do giảng viên cung cấp trước khi điều phối viên xác nhận."
+    ),
+    "Approved revision with clarified cohort range and indexing provenance.": (
+        "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và nguồn gốc chỉ mục."
+    ),
+    "Approved revision with clarified cohort range and updated indexing provenance.": (
+        "Bản chỉnh sửa đã được duyệt sau khi làm rõ phạm vi khóa và cập nhật nguồn gốc chỉ mục."
+    ),
+    "Reviewed publication dates and enrollment timeline from the official source page.": (
+        "Đã rà soát ngày công bố và mốc thời gian đăng ký từ trang nguồn chính thức."
+    ),
+    "Approved from submission sub-002 and now eligible for student-facing assistant answers.": (
+        "Đã được duyệt từ phiếu nộp sub-002 và đủ điều kiện dùng trong "
+        "câu trả lời dành cho sinh viên."
+    ),
+    "Approved for public student-facing chat after date range verification.": (
+        "Được duyệt cho kênh chat sinh viên sau khi xác minh khoảng thời gian hiệu lực."
+    ),
     "Published after review approval from submission sub-002.": "Được công bố sau khi duyệt phiếu nộp sub-002.",
     "Expanded cohort coverage to include 2026.": "Mở rộng phạm vi khóa áp dụng để bao gồm năm 2026.",
     "Confirmed publishable validity window through 2026-04-05.": "Xác nhận khoảng hiệu lực có thể công bố đến ngày 2026-04-05.",
@@ -50,8 +76,12 @@ EXACT_TEXT_REPLACEMENTS = {
     "Upload completed successfully.": "Tải lên hoàn tất thành công.",
     "Embedding step failed. Retry available.": "Bước tạo embedding thất bại. Có thể thử lại.",
     "Scanning source pages and scheduling updates.": "Đang quét các trang nguồn và lên lịch cập nhật.",
-    "Submission accepted by the /web BFF and queued for extraction.": "Phiếu nộp đã được tiếp nhận và đưa vào hàng chờ trích xuất.",
-    "Frontend-aligned ingestion contract generated a provisional temporal preview.": "Bản xem trước thời gian hiệu lực được tạo tạm thời từ hợp đồng ingest của frontend.",
+    "Submission accepted by the /web BFF and queued for extraction.": (
+        "Phiếu nộp đã được tiếp nhận và đưa vào hàng chờ trích xuất."
+    ),
+    "Frontend-aligned ingestion contract generated a provisional temporal preview.": (
+        "Bản xem trước thời gian hiệu lực được tạo tạm thời từ hợp đồng ingest của frontend."
+    ),
 }
 
 DOCUMENT_INDEX_EXCERPTS = {

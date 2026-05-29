@@ -41,8 +41,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 from fastapi import FastAPI
@@ -50,6 +51,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from app.api import health as health_api
+from app.api.metrics import setup_metrics
 from app.clients.circuit_breaker import CircuitBreaker, ProbeResult
 from app.clients.langgraph import LangGraphClient
 from app.core.errors import StructuredError
@@ -58,8 +61,6 @@ from app.core.settings import (
     Settings,
     get_settings,
 )
-from app.api import health as health_api
-from app.api.metrics import setup_metrics
 
 logger = logging.getLogger(__name__)
 

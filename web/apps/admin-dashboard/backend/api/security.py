@@ -33,7 +33,7 @@ class InMemoryRateLimiter:
 
     def consume(self, *, key: str, limit: int, window_seconds: int, now: float | None = None) -> int | None:
         timestamp = monotonic() if now is None else now
-        retry_after = max(window_seconds, 1)
+        max(window_seconds, 1)
 
         with self._lock:
             bucket = self._entries[key]

@@ -29,7 +29,12 @@ def reset_service_state(monkeypatch):
     data_root = Path(__file__).resolve().parent.parent / "data"
     data_root.mkdir(parents=True, exist_ok=True)
     db_path = data_root / f"workspace-test-{uuid4().hex}.sqlite3"
-    for extra_path in (db_path, db_path.with_name(f"{db_path.name}-journal"), db_path.with_name(f"{db_path.name}-shm"), db_path.with_name(f"{db_path.name}-wal")):
+    for extra_path in (
+        db_path,
+        db_path.with_name(f"{db_path.name}-journal"),
+        db_path.with_name(f"{db_path.name}-shm"),
+        db_path.with_name(f"{db_path.name}-wal"),
+    ):
         extra_path.unlink(missing_ok=True)
     database_url = f"sqlite+pysqlite:///{db_path.as_posix()}"
     monkeypatch.setattr(settings, "WORKSPACE_DATABASE_URL", database_url)
@@ -42,7 +47,12 @@ def reset_service_state(monkeypatch):
     current_store = get_workspace_service().store
     if isinstance(current_store, SqlAlchemyWorkspaceStore):
         current_store.dispose()
-    for extra_path in (db_path, db_path.with_name(f"{db_path.name}-journal"), db_path.with_name(f"{db_path.name}-shm"), db_path.with_name(f"{db_path.name}-wal")):
+    for extra_path in (
+        db_path,
+        db_path.with_name(f"{db_path.name}-journal"),
+        db_path.with_name(f"{db_path.name}-shm"),
+        db_path.with_name(f"{db_path.name}-wal"),
+    ):
         extra_path.unlink(missing_ok=True)
 
 

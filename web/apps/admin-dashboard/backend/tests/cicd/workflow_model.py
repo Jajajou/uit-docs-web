@@ -24,9 +24,9 @@ The decisions encoded here mirror Requirement 1 of ``requirements.md``:
 from __future__ import annotations
 
 import fnmatch
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Literal
-
+from typing import Literal
 
 EventKind = Literal[
     "pull_request",

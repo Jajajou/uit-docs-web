@@ -25,7 +25,7 @@ Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8.
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from tests.cicd.workflow_model import Workflow
 

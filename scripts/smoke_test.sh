@@ -142,10 +142,11 @@ done
 [[ -n "$UPSTREAM_URL" ]] || bad_arg "Missing required argument: --upstream-url"
 
 # Compose probe URLs. Strip a single trailing slash so we always join exactly
-# one. LangGraph exposes /ok as the stable public health endpoint.
+# one. The upstream probe targets /health per the LangGraph contract surface
+# documented in design C10/C12 and Requirement 18.2.
 B_PROBE="${BACKEND_URL%/}/healthz"
 F_PROBE="${FRONTEND_URL%/}/"
-U_PROBE="${UPSTREAM_URL%/}/ok"
+U_PROBE="${UPSTREAM_URL%/}/health"
 
 # ---------------------------------------------------------------------------
 # Probe execution

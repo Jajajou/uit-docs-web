@@ -127,7 +127,7 @@ class SsoProviderConfig:
 
         return max(candidates, key=lambda role: INTERNAL_ROLE_PRIORITY.get(role, -1))
 
-    def exchange_code_for_identity(self, *, code: str, request_base_url: str) -> "SsoProviderIdentity":
+    def exchange_code_for_identity(self, *, code: str, request_base_url: str) -> SsoProviderIdentity:
         if self.uses_local_emulator:
             raise ApiServiceError(
                 status_code=400,

@@ -7,15 +7,15 @@ only the affected row(s) instead of the full state.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from copy import deepcopy
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-import re
 from time import sleep
-import unicodedata
-from urllib.parse import urlparse
 from typing import Any, cast
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from api.clients.langgraph_client import get_internal_langgraph_client, get_public_langgraph_client
@@ -1511,7 +1511,10 @@ class InMemoryWorkspaceService:
             answer_lines.extend(
                 [
                     "",
-                    "Chưa thấy tài liệu công khai trong các nguồn trên xác nhận có thay đổi. Bộ nguồn hiện tại chủ yếu cho biết phạm vi áp dụng và mốc thời gian hiệu lực.",
+                    (
+                        "Chưa thấy tài liệu công khai trong các nguồn trên xác nhận có thay đổi. "
+                        "Bộ nguồn hiện tại chủ yếu cho biết phạm vi áp dụng và mốc thời gian hiệu lực."
+                    ),
                 ]
             )
 
@@ -2266,7 +2269,7 @@ class InMemoryWorkspaceService:
         if response_type_warning is not None:
             warnings.append(response_type_warning)
         top_document = ranked_reference_documents[0]["document"] if ranked_reference_documents else None
-        final_content = self._build_temporal_validity_answer(question, top_document) or raw_response
+        self._build_temporal_validity_answer(question, top_document) or raw_response
         if False:
             warnings.append(
                 {

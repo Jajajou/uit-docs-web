@@ -14,11 +14,23 @@ from api.config import settings
 from api.errors import ApiServiceError, build_error_response
 from api.routers import admin, analytics, auth, chat, documents, jobs, langgraph, reviews, submissions, test_support, upload
 from api.security import apply_security_headers, build_https_redirect_response, enforce_trusted_host
+from app.api import health as health_api
+from app.api.metrics import setup_metrics
+from app.clients.circuit_breaker import CircuitBreaker
+from app.middleware.request_log import RequestLogMiddleware
+
+# Single circuit breaker instance shared across the app. The LangGraph upstream
+# in the legacy ``api.routers.langgraph`` path is not yet wired through it, so
+# the breaker stays in the ``Closed`` state in practice. Mounting it on
+# ``app.state`` keeps the new ``/healthz`` and ``/metrics`` surfaces from
+# ``app/`` happy without changing any existing route handlers.
+_circuit_breaker = CircuitBreaker()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    app.state.circuit_breaker = _circuit_breaker
     yield
 
 
@@ -36,6 +48,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Structured per-request JSON log (R17.5). Added after CORS so it wraps the
+# CORS middleware in Starlette's LIFO middleware stack and still produces a
+# log line for cross-origin preflights.
+app.add_middleware(RequestLogMiddleware)
 
 
 @app.middleware("http")
@@ -98,6 +115,17 @@ app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(test_support.router, prefix="/api/test", tags=["Test Support"])
+
+# /healthz: LangGraph-aware liveness probe used by docker-compose, smoke tests,
+# and Render's post-deploy probe (design C10/C11/C12). Kept side-by-side with
+# the legacy /health endpoint below so existing callers keep working.
+app.include_router(health_api.router)
+
+# Prometheus /metrics endpoint (design C13, R17.6). Reads the breaker mounted
+# on ``app.state.circuit_breaker`` to expose the langgraph_circuit_state gauge
+# and registers the http_requests_total / http_request_duration_seconds
+# counters via the instrumentator.
+setup_metrics(app, _circuit_breaker)
 
 
 @app.get("/health")

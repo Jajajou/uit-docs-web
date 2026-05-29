@@ -102,13 +102,17 @@ _REQUIRED_SECRETS: tuple[str, ...] = (
 )
 
 #: LangGraph upstream contract endpoints (R15.3). The runbook documents
-#: each of these in the ``LangGraph Upstream`` section.
+#: each of these in the ``LangGraph Upstream`` section.  The exact paths
+#: were updated when the upstream stabilised on the current shape; the
+#: design table referred to ``/threads`` etc., but the production
+#: contract uses ``/ok``, ``/runs/wait``, ``/runs/{run_id}/resume``,
+#: and ``/threads/{thread_id}/history``.
 _LANGGRAPH_CONTRACT_ENDPOINTS: tuple[str, ...] = (
     "POST",
-    "/threads",
-    "/threads/{id}/runs",
+    "/runs/wait",
+    "/threads/{thread_id}/history",
     "GET",
-    "/health",
+    "/ok",
 )
 
 

@@ -98,7 +98,14 @@ def _build_app(*, status_code: int, user_id: str | None) -> Starlette:
 )
 @given(
     method=st.sampled_from(HTTP_METHODS),
-    path=st.from_regex(r"^/[a-z0-9/\-_]{0,64}$", fullmatch=True),
+    # Exclude paths starting with ``//`` because httpx/Starlette parse the
+    # leading ``//`` as a URL authority delimiter and normalise the path,
+    # which would make the round-tripped ``path`` field disagree with the
+    # raw input that Hypothesis drew. The whitelist regex is unchanged
+    # otherwise so the test still covers every other path shape.
+    path=st.from_regex(r"^/[a-z0-9/\-_]{0,64}$", fullmatch=True).filter(
+        lambda p: not p.startswith("//")
+    ),
     status=st.integers(min_value=100, max_value=599),
     user_id=st.one_of(st.none(), st.text(min_size=0, max_size=64)),
 )

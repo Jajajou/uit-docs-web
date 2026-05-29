@@ -9,8 +9,8 @@ This keeps the /web backend tolerant to the new LangGraph direction:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 NormalizedResponseType = Literal["full_answer", "partial_answer", "fallback"]

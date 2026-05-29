@@ -50,7 +50,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Mapping
+from collections.abc import Mapping
 
 
 def simulate_layer_digest(
