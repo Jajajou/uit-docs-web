@@ -1,0 +1,175 @@
+# render.yaml — Infrastructure-as-code for Render.com staging
+#
+# Apply this file by creating a new "Blueprint" on https://dashboard.render.com
+# and pointing it at https://github.com/Jajajou/uit-docs-web (branch
+# web_implement_split). Render parses this file to provision the service.
+#
+# Free-tier notes:
+#   - Web services on the `free` plan sleep after 15 min idle and have a 750
+#     hours / month cap. To keep staging warm, configure cron-job.org (free)
+#     to ping `https://<service>.onrender.com/health` every 10 minutes.
+#   - Render's free tier does NOT bundle a Postgres in this blueprint. Use
+#     Neon (https://neon.tech) — free 0.5 GB, no credit card — and paste the
+#     connection string into the WORKSPACE_DATABASE_URL secret on Render.
+#   - $PORT is injected by Render at runtime; the Dockerfile honours it via
+#     `${PORT:-8001}`.
+
+services:
+  - type: web
+    name: uit-docs-backend
+    runtime: docker
+    plan: free
+    region: singapore   # closest to UIT (HCMC). Free plan supported.
+    branch: web_implement_split
+    autoDeploy: true
+
+    # Build context lives inside the monorepo split; rootDir scopes Render's
+    # build to the backend folder and the Dockerfile sits at its root.
+    rootDir: web/apps/admin-dashboard/backend
+    dockerfilePath: Dockerfile
+
+    healthCheckPath: /health
+
+    envVars:
+      # ---- Server identity ----
+      - key: ENV
+        value: staging
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # ---- Database (Neon Postgres) ----
+      # Set both names so legacy api/config.py and the new app/core/settings
+      # paths work without code branching. Paste the same Neon connection
+      # string into both via the Render dashboard.
+      - key: WORKSPACE_DATABASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WORKSPACE_AUTO_SEED
+        value: "true"
+
+      # ---- LangGraph upstream (Cloudflare Tunnel HTTPS) ----
+      # Both names are needed: api.config.settings reads LANGGRAPH_URL while
+      # app.core.settings reads LANGGRAPH_UPSTREAM_URL. Set both to the
+      # current `trycloudflare.com` URL; rotate when the tunnel restarts.
+      - key: LANGGRAPH_URL
+        sync: false
+      - key: LANGGRAPH_PUBLIC_URL
+        sync: false
+      - key: LANGGRAPH_UPSTREAM_URL
+        sync: false
+      - key: LANGGRAPH_API_KEY
+        sync: false
+      - key: LANGGRAPH_PUBLIC_API_KEY
+        sync: false
+      - key: LANGGRAPH_INTERNAL_ASSISTANT_ID
+        value: "5bbc8364-e383-5087-8a2f-b6d27677f7a1"
+      - key: LANGGRAPH_PUBLIC_ASSISTANT_ID
+        value: "retrieval"
+      - key: LANGGRAPH_TIMEOUT_SECONDS
+        value: "180"
+
+      # ---- LightRAG (optional in staging — leave URL empty to skip) ----
+      - key: LIGHTRAG_URL
+        sync: false
+      - key: LIGHTRAG_USERNAME
+        sync: false
+      - key: LIGHTRAG_PASSWORD
+        sync: false
+      - key: LIGHTRAG_API_KEY
+        sync: false
+      - key: LIGHTRAG_PUBLIC_URL
+        sync: false
+      - key: LIGHTRAG_PUBLIC_USERNAME
+        sync: false
+      - key: LIGHTRAG_PUBLIC_PASSWORD
+        sync: false
+
+      # ---- File upload (Render filesystem is ephemeral) ----
+      - key: UPLOAD_DIR
+        value: "/tmp/uploads"
+      - key: UPLOAD_STAGING_DIR
+        value: "/tmp/uploads/staging"
+      - key: MAX_FILE_SIZE
+        value: "52428800"
+
+      # ---- CORS / Trusted hosts ----
+      # Vercel preview + production URLs go in CORS_ORIGINS so the React SPA
+      # can call the backend directly when the proxy is bypassed (rare). The
+      # primary path is via Vercel rewrites under the same origin, which
+      # never triggers CORS.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
+      - key: FORCE_HTTPS_REDIRECT
+        value: "true"
+
+      # ---- Cookies / sessions / rate limit ----
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: SESSION_COOKIE_SAMESITE
+        value: "lax"
+      - key: SESSION_COOKIE_DOMAIN
+        sync: false
+      - key: EXPOSE_ERROR_DETAILS
+        value: "false"
+      - key: TEST_MODE
+        value: "false"
+      - key: AUTH_RATE_LIMIT_WINDOW_SECONDS
+        value: "60"
+      - key: AUTH_RATE_LIMIT_MAX_REQUESTS
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true   # Render auto-generates a strong secret on
+                              # first deploy and stores it permanently.
+
+      # ---- Google SSO (production sign-in path) ----
+      - key: SSO_PROVIDER_MODE
+        value: "external"
+      - key: SSO_PROVIDER_NAME
+        value: "Google Workspace UIT"
+      - key: SSO_AUTHORIZE_URL
+        value: "https://accounts.google.com/o/oauth2/v2/auth"
+      - key: SSO_TOKEN_URL
+        value: "https://oauth2.googleapis.com/token"
+      - key: SSO_USERINFO_URL
+        value: "https://openidconnect.googleapis.com/v1/userinfo"
+      - key: SSO_CLIENT_ID
+        sync: false
+      - key: SSO_CLIENT_SECRET
+        sync: false
+      - key: SSO_SCOPE
+        value: "openid email profile"
+      - key: SSO_HOSTED_DOMAIN
+        sync: false
+      - key: SSO_CALLBACK_BASE_URL
+        sync: false
+      - key: SSO_FRONTEND_BASE_URL
+        sync: false
+      - key: SSO_ROLE_CLAIM
+        value: "role"
+      - key: SSO_GROUP_CLAIM
+        value: "groups"
+      - key: SSO_EMAIL_CLAIM
+        value: "email"
+      - key: SSO_GROUP_ROLE_MAP
+        sync: false
+      - key: SSO_ROLE_HINT_MAP
+        value: "teacher:teacher,admin:admin"
+      - key: ENABLE_DEMO_AUTH
+        value: "true"   # staging: keep demo auth on so smoke tests work
+                        # without OAuth. Flip to `false` for prod.
+
+      # Optional Google-style aliases (handy if your tooling expects them).
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+
+      # ---- Live ingestion gateway ----
+      - key: LIVE_INGESTION_MODE
+        value: "false"   # staging starts with mocks; flip after smoke
+                         # passes against the Cloudflare Tunnel upstream.
