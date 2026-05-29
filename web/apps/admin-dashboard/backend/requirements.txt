@@ -1,0 +1,12 @@
+# Runtime dependencies for admin-dashboard backend.
+# All entries MUST be pinned with an exact `==` so the lockfile-pin guard
+# (scripts/ci/check_requirements_pinned.sh) succeeds in CI (Requirements 19.3, 19.5).
+#
+# This file is filled in incrementally by the cicd-deploy-admin-dashboard
+# spec tasks; the editable install via pyproject.toml remains the source of
+# truth for local development.  Each runtime dependency added by a task
+# should be listed here with an exact version pin.
+httpx==0.28.1
+pydantic-settings==2.13.1
+tenacity==9.1.4
+prometheus-fastapi-instrumentator==7.1.0

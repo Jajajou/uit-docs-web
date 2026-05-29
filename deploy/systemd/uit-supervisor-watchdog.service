@@ -1,0 +1,59 @@
+# deploy/systemd/uit-supervisor-watchdog.service
+#
+# Host-side restart-loop watchdog for the docker-compose supervisor.
+# This is a `oneshot` service driven by uit-supervisor-watchdog.timer
+# (every 30 seconds). The script runs one pass over `docker events`
+# and exits.
+#
+# Installation:
+#   1. Copy scripts/supervisor_watchdog.sh to /usr/local/bin/ and make
+#      it executable:
+#        install -m 0755 scripts/supervisor_watchdog.sh \
+#          /usr/local/bin/uit-supervisor-watchdog.sh
+#   2. Copy the backoff library alongside the watchdog so the
+#      `source "${_WATCHDOG_DIR}/lib/compute_backoff.sh"` line at the
+#      top of the script resolves. The watchdog `exit 5`s if it cannot
+#      find the file.
+#        install -m 0644 -D scripts/lib/compute_backoff.sh \
+#          /usr/local/bin/lib/compute_backoff.sh
+#   3. Copy this unit and the matching .timer to /etc/systemd/system/.
+#   4. systemctl daemon-reload
+#   5. systemctl enable --now uit-supervisor-watchdog.timer
+#
+# See design.md section C11 ("Restart-loop backoff (R16.8)") for the
+# canonical algorithm.
+
+[Unit]
+Description=UIT admin-dashboard restart-loop watchdog (one-shot pass)
+Documentation=https://github.com/uit/admin-dashboard/blob/main/.kiro/specs/cicd-deploy-admin-dashboard/design.md
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# The watchdog must shell out to `docker compose`, so it needs access
+# to the docker socket. The `uit` deploy user is expected to be a
+# member of the `docker` group.
+User=uit
+Group=docker
+ExecStart=/usr/local/bin/uit-supervisor-watchdog.sh --compose-file /opt/uit/docker-compose.yml --window 60
+
+# A pass must finish well within the 30s timer cadence; cap it at 5
+# minutes so a stuck pass cannot pile up indefinitely.
+TimeoutStartSec=300
+
+# Send all output to journald so operators can use
+# `journalctl -u uit-supervisor-watchdog.service`.
+StandardOutput=journal
+StandardError=journal
+
+# Defensive hardening — the watchdog only needs to read /opt/uit and
+# talk to the docker socket.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

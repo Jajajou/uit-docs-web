@@ -1,0 +1,58 @@
+# .github/branch-protection.yml
+#
+# Declarative branch-protection configuration applied by the
+# probot/settings GitHub App (or any compatible reconciler that consumes
+# the same schema, e.g. https://github.com/repository-settings/app).
+#
+# Source of truth: docs/runbooks/admin-dashboard.md (## Branch Protection).
+#
+# Requirements satisfied:
+#   * Requirement 2.7 — `frontend-ci` required on `main`.
+#   * Requirement 3.4 — `backend-ci` required on `main`.
+#   * Requirement 4.4 — `langgraph-ci` required on `main`.
+#   * Requirement 5.1 — workflows run in parallel (no serialization here).
+#   * Requirement 5.2 — failed required check disables merge until
+#                       re-run is `success` or superseded by a new commit.
+#   * Requirement 5.3 — required checks must conclude `success` (with
+#                       auto-merge optionally permitted by repo settings).
+#   * Requirement 5.4 — concurrency on PR ref handled by each workflow's
+#                       own `concurrency:` block; this file just makes the
+#                       checks required.
+#
+# Keep the `contexts` array below in sync with the workflow `name:`
+# fields in `.github/workflows/{frontend-ci,backend-ci,langgraph-ci}.yml`
+# and with the registry in `tests/cicd/workflow_registry.py`.
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        # `strict: true` requires the head ref to be up to date with
+        # `main` before merging, so the required checks run on the
+        # post-merge tree.
+        strict: true
+        contexts:
+          - frontend-ci
+          - backend-ci
+          - langgraph-ci
+
+      # Pull-request reviews
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+
+      # Require all review threads to be resolved before merging.
+      required_conversation_resolution: true
+
+      # Admins are bound by the same rules — no bypass.
+      enforce_admins: true
+
+      # `main` is append-only and undeletable.
+      allow_force_pushes: false
+      allow_deletions: false
+
+      # No restriction on who can push (PR-mediated only via required
+      # reviews above). Set `restrictions: null` to remove any prior
+      # team/user restriction.
+      restrictions: null

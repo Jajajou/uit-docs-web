@@ -1,0 +1,168 @@
+name: pr-status-summary
+
+# PR Status Summary Reporter (design C16, Requirements 21.1-21.4).
+#
+# Triggered on completion of every workflow listed in Requirement 1.1.
+# For each completion this workflow:
+#   1. Posts a per-workflow GitHub commit status to the head SHA via
+#      POST /repos/{owner}/{repo}/statuses/{sha} with
+#      context = workflow filename without .yml/.yaml extension and
+#      state mapped to {success, failure, error} (R21.1).
+#   2. Resolves the PR(s) from workflow_run.pull_requests. If the array
+#      is empty (e.g. push to main, tag push), only the status is
+#      posted and the comment step is skipped.
+#   3. For each matching PR, finds the single summary comment authored
+#      by github-actions[bot] whose body starts with the marker
+#      `<!-- pr-status-summary:v1 -->` and edits it in place; if none
+#      exists, creates exactly one. Other comments are never modified
+#      (R21.2, R21.3, R21.4).
+#
+# The marker comment is the idempotency token; concurrency is serialized
+# per head_sha so simultaneous completions cannot create duplicates.
+
+on:
+  workflow_run:
+    workflows:
+      - frontend-ci
+      - backend-ci
+      - langgraph-ci
+      - e2e-live
+      - docker-build-publish
+      - release
+      - staging-deploy
+      - production-deploy
+    types:
+      - completed
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: write
+
+concurrency:
+  # Serialize updates per commit so create/edit logic on the marker
+  # comment never races with a parallel completion.
+  group: pr-status-summary-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  summarize:
+    name: post status and update PR summary comment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Post per-workflow status and update PR summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const headSha = run.head_sha;
+
+            // Derive the status `context` from the workflow filename
+            // (R21.1: filename without .yml/.yaml extension).
+            const filename = (run.path || '').split('/').pop() || run.name;
+            const statusContext = filename.replace(/\.ya?ml$/i, '');
+
+            // Map the workflow_run conclusion onto the GitHub commit
+            // status state domain. Per task spec:
+            //   success                       -> "success"
+            //   failure | cancelled | timed_out -> "failure"
+            //   anything else                 -> "error"
+            const conclusion = run.conclusion;
+            let state;
+            if (conclusion === 'success') {
+              state = 'success';
+            } else if (
+              conclusion === 'failure' ||
+              conclusion === 'cancelled' ||
+              conclusion === 'timed_out'
+            ) {
+              state = 'failure';
+            } else {
+              state = 'error';
+            }
+
+            // 1. Post the per-workflow commit status (R21.1).
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: headSha,
+              state: state,
+              context: statusContext,
+              description: `${statusContext} concluded: ${conclusion ?? 'unknown'}`,
+              target_url: run.html_url,
+            });
+            core.info(`Posted status ${statusContext}=${state} on ${headSha}`);
+
+            // 2. Resolve PRs from workflow_run.pull_requests. If empty
+            // (push to main, tag push, fork PR with no association),
+            // only the status was required; skip the comment step.
+            const prs = Array.isArray(run.pull_requests) ? run.pull_requests : [];
+            if (prs.length === 0) {
+              core.info(`workflow_run.pull_requests is empty for ${headSha}; status check posted, summary comment skipped.`);
+              return;
+            }
+
+            // 3. Build the summary body for the triggering workflow.
+            const MARKER = '<!-- pr-status-summary:v1 -->';
+            const iconFor = (c) => {
+              if (c === 'success') return ':white_check_mark:';
+              if (c === 'failure') return ':x:';
+              if (c === 'cancelled') return ':no_entry_sign:';
+              if (c === 'skipped') return ':fast_forward:';
+              if (c === 'timed_out') return ':alarm_clock:';
+              return ':grey_question:';
+            };
+            const updatedAt = new Date().toISOString();
+            const shortSha = headSha.substring(0, 7);
+            const body = [
+              MARKER,
+              '',
+              '## CI/CD Workflow Summary',
+              '',
+              `Commit: \`${shortSha}\``,
+              '',
+              '| Workflow | Status | Result |',
+              '| --- | --- | --- |',
+              `| [${statusContext}](${run.html_url}) | ${iconFor(conclusion)} | ${conclusion ?? 'unknown'} |`,
+              '',
+              `_Last updated by ${statusContext} at ${updatedAt}._`,
+            ].join('\n');
+
+            // 4. For each PR: edit the marker comment in place, or
+            // create exactly one if none exists. Never modify any
+            // other comment (R21.4).
+            for (const pr of prs) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                per_page: 100,
+              });
+              const markerComments = comments.filter(c =>
+                c.user && c.user.login === 'github-actions[bot]' &&
+                typeof c.body === 'string' && c.body.startsWith(MARKER)
+              );
+
+              if (markerComments.length === 0) {
+                const created = await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: body,
+                });
+                core.info(`Created summary comment ${created.data.id} on PR #${pr.number}`);
+              } else {
+                // Edit the oldest marker comment in place; leave any
+                // duplicates untouched (R21.4 forbids modification of
+                // any other comment, even other bot comments).
+                const target = markerComments.sort((a, b) => a.id - b.id)[0];
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: target.id,
+                  body: body,
+                });
+                core.info(`Updated summary comment ${target.id} on PR #${pr.number}`);
+              }
+            }

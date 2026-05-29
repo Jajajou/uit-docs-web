@@ -1,0 +1,73 @@
+# Admin Dashboard — development overlay
+#
+# Per design C11, the production source of truth is the root docker-compose.yml.
+# This file adds dev-specific bind mounts and env files on top of the same
+# service keys (admin_backend, admin_frontend) so it can be combined with the
+# root compose:
+#
+#   # standalone dev (no root compose):
+#   cd web/apps/admin-dashboard && docker compose up -d
+#
+#   # overlay on top of the production compose (dev hot-reload, prod-shaped services):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f web/apps/admin-dashboard/docker-compose.yml \
+#     up -d
+#
+# In overlay mode, paths in this file resolve relative to this file's directory.
+# Bind-mounting the source directories over /app gives Vite/uvicorn live reload
+# without rebuilding the image. restart: unless-stopped is kept for parity with
+# the production compose (R16.2).
+
+services:
+  admin_backend:
+    container_name: admin_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      # Base env (shared with prod). Optional so the overlay parses on a fresh checkout.
+      - path: ./backend/.env
+        required: false
+      # Dev-only overrides (DEBUG, hot-reload flags, local DSNs, etc.).
+      - path: ./backend/.env.dev
+        required: false
+    ports:
+      - "8001:8001"
+    volumes:
+      # Dev hot-reload: bind the backend source over the image's WORKDIR.
+      - ./backend:/app
+      # Keep uploads on a stable host path (survives container recreate).
+      - ./backend/uploads:/app/uploads
+    environment:
+      - LIGHTRAG_URL=http://lightrag_uit:9621
+    networks:
+      - uit_network
+    restart: unless-stopped
+
+  admin_frontend:
+    container_name: admin_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    env_file:
+      # Vite-style dev env (VITE_API_BASE_URL, etc.). Optional for fresh checkouts.
+      - path: ./frontend/.env.dev
+        required: false
+    ports:
+      - "3000:3000"
+    volumes:
+      # Dev hot-reload: bind the frontend source over the image's WORKDIR.
+      - ./frontend:/app
+      # Anonymous volume so the host's (possibly missing/stale) node_modules
+      # does not shadow the dependencies installed inside the image.
+      - /app/node_modules
+    depends_on:
+      - admin_backend
+    networks:
+      - uit_network
+    restart: unless-stopped
+
+networks:
+  uit_network:
+    external: true

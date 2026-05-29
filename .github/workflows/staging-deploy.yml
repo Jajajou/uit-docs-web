@@ -1,0 +1,416 @@
+name: staging-deploy
+
+# Staging deployment workflow for the admin dashboard. Implements task
+# 13.3 of the cicd-deploy-admin-dashboard spec and design section C8.
+#
+# Trigger envelope (Requirement 9.1):
+#   - workflow_run on docker-build-publish, on `main`, gated by
+#     `conclusion == 'success'` so we never deploy a failed build.
+#
+# Pipeline shape (design C8):
+#
+#   resolve_image_tag           [computes IMAGE_TAG = sha-<head_sha>]
+#         |
+#     ----+----------------------------+
+#         |                            |
+#   deploy_frontend (Vercel)     deploy_backend (SSH ssh_deploy.sh)
+#     continue-on-error: true     continue-on-error: true
+#         |                            |
+#         +-------------+--------------+
+#                       |
+#                  smoke_test          (scripts/smoke_test.sh, 5min outer budget)
+#                       |
+#         +-------------+--------------+
+#         |                            |
+#       rollback                      notify
+#  (on smoke_test failure)        (on smoke or rollback failure)
+#
+# Key notes:
+#   * Both deploy branches use `continue-on-error: true` per Requirement
+#     9.3 and the task brief: a single-component deploy failure does not
+#     skip the smoke step. The smoke test is the single source of truth
+#     for whether the staging deploy is healthy.
+#   * `timeout-minutes: 15` is enforced on each deploy job per the task
+#     brief. The smoke step uses a 6-minute job timeout (5-minute outer
+#     budget per Requirement 9.4 plus a small overhead for setup).
+#   * Rollback is gated on smoke_test failure and bounded to 10 minutes
+#     per Requirement 9.5. Failure of rollback itself fails the workflow
+#     and feeds into the notify job.
+#   * Notify posts a JSON payload to ${{ secrets.DEPLOY_FAILURE_WEBHOOK_URL }}
+#     within 2 minutes (Requirement 9.6) naming the failing component,
+#     the staging stage, and the run URL.
+
+on:
+  workflow_run:
+    workflows: ['docker-build-publish']
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  # Single in-flight staging deploy at a time; do not cancel an in-flight
+  # deploy when a newer build completes — let it finish (or fail and
+  # rollback) before the next one starts. This keeps the host-side
+  # deployment manifest (D3) consistent.
+  group: staging-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 0. Gate on the upstream build's success and compute the image tag.
+  #    Acts as the single guardrail so every downstream job can `needs:`
+  #    this job and inherit the gating without repeating the condition.
+  # ---------------------------------------------------------------------
+  resolve_image_tag:
+    name: Resolve image tag
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+      head_sha: ${{ steps.tag.outputs.head_sha }}
+    steps:
+      - name: Compute image tag
+        id: tag
+        # Per docker-build-publish.yml + Property 12, a `push: main`
+        # build emits the tag set {main, sha-<sha>}. We deploy the
+        # commit-pinned `sha-<sha>` tag so the staging environment is
+        # always traceable to a specific commit.
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HEAD_SHA:-}" ]]; then
+            echo "::error::workflow_run.head_sha is empty; cannot resolve image tag"
+            exit 1
+          fi
+          {
+            echo "image_tag=sha-${HEAD_SHA}"
+            echo "head_sha=${HEAD_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------
+  # 1a. Deploy Admin_Frontend to a Vercel preview deployment.
+  #     `continue-on-error: true` per the task brief.
+  # ---------------------------------------------------------------------
+  deploy_frontend:
+    name: Deploy Admin_Frontend (Vercel preview)
+    needs: resolve_image_tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    outputs:
+      preview_url: ${{ steps.deploy.outputs.preview_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve_image_tag.outputs.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project (preview)
+        # `vercel pull` requires VERCEL_TOKEN and the project + org IDs
+        # so the CLI knows which project this checkout maps to. Org and
+        # project IDs are non-secret but are stored as repository
+        # variables/secrets per Vercel CLI conventions.
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: web/apps/admin-dashboard/frontend
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Build with Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        working-directory: web/apps/admin-dashboard/frontend
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        working-directory: web/apps/admin-dashboard/frontend
+        # `vercel deploy --prebuilt` prints the deployment URL on the
+        # last line of stdout. Capture it so the smoke_test job can use
+        # it as the frontend probe target (preferring it over a static
+        # secret URL when present).
+        run: |
+          set -euo pipefail
+          url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN" | tail -n 1)
+          if [[ -z "$url" ]]; then
+            echo "::error::vercel deploy did not return a URL"
+            exit 1
+          fi
+          printf 'preview_url=%s\n' "$url" >> "$GITHUB_OUTPUT"
+          printf '[deploy_frontend] preview_url=%s\n' "$url"
+
+  # ---------------------------------------------------------------------
+  # 1b. Deploy Admin_Backend + LightRAG_Service to the staging host via
+  #     SSH. Both services are managed by a single docker-compose stack
+  #     so a single `ssh_deploy.sh` invocation updates both atomically
+  #     (design C8/C11; ssh_deploy.sh runs `docker compose pull` +
+  #     `docker compose up -d` against the production Compose_File).
+  # ---------------------------------------------------------------------
+  deploy_backend:
+    name: Deploy Admin_Backend & LightRAG_Service (SSH)
+    needs: resolve_image_tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve_image_tag.outputs.head_sha }}
+
+      - name: Write SSH private key
+        id: ssh_key
+        # File-based secret per Requirement 13.4: written under
+        # ${{ runner.temp }}, chmod 600, and unconditionally deleted in
+        # the cleanup step below.
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          key_path="${RUNNER_TEMP}/staging_ssh_key"
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          echo "key_path=${key_path}" >> "$GITHUB_OUTPUT"
+
+      - name: SSH deploy (admin_backend + lightrag_uit)
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_PRIVATE_KEY_PATH: ${{ steps.ssh_key.outputs.key_path }}
+          IMAGE_TAG: ${{ needs.resolve_image_tag.outputs.image_tag }}
+          # Production source-of-truth Compose_File on the host (design
+          # "Source of Truth"; runbook "Operator Commands").
+          COMPOSE_FILE_PATH: /opt/uit/docker-compose.yml
+        run: bash scripts/deploy/ssh_deploy.sh
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f "${{ steps.ssh_key.outputs.key_path }}"
+
+  # ---------------------------------------------------------------------
+  # 2. Smoke test the staging environment via scripts/smoke_test.sh.
+  #
+  #    `if: !cancelled()` lets this run regardless of whether either
+  #    deploy branch failed (R9.3). The outer `timeout 300` enforces the
+  #    5-minute overall budget (R9.4); the script itself enforces a
+  #    short per-probe timeout (5s) which is well inside the 30-second
+  #    per-URL ceiling required by R9.4.
+  # ---------------------------------------------------------------------
+  smoke_test:
+    name: Smoke test staging
+    needs: [resolve_image_tag, deploy_frontend, deploy_backend]
+    if: ${{ !cancelled() && needs.resolve_image_tag.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    outputs:
+      result: ${{ steps.smoke.outputs.result }}
+      frontend_url: ${{ steps.urls.outputs.frontend_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve_image_tag.outputs.head_sha }}
+
+      - name: Resolve smoke probe URLs
+        id: urls
+        # Prefer the freshly minted Vercel preview URL when the frontend
+        # deploy succeeded; fall back to a static STAGING_FRONTEND_URL
+        # secret when the deploy was skipped or failed (smoke is still
+        # the source of truth for staging health).
+        env:
+          PREVIEW_URL: ${{ needs.deploy_frontend.outputs.preview_url }}
+          FALLBACK_FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL }}
+          BACKEND_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          UPSTREAM_URL: ${{ secrets.LANGGRAPH_UPSTREAM_URL }}
+        run: |
+          set -euo pipefail
+          frontend_url="${PREVIEW_URL:-$FALLBACK_FRONTEND_URL}"
+          if [[ -z "$frontend_url" ]]; then
+            echo "::error::No frontend URL available (Vercel preview missing and STAGING_FRONTEND_URL unset)"
+            exit 1
+          fi
+          if [[ -z "${BACKEND_URL:-}" ]]; then
+            echo "::error::STAGING_BACKEND_URL secret is not set"
+            exit 1
+          fi
+          if [[ -z "${UPSTREAM_URL:-}" ]]; then
+            echo "::error::LANGGRAPH_UPSTREAM_URL secret is not set"
+            exit 1
+          fi
+          {
+            echo "frontend_url=${frontend_url}"
+            echo "backend_url=${BACKEND_URL}"
+            echo "upstream_url=${UPSTREAM_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run smoke_test.sh
+        id: smoke
+        env:
+          FRONTEND_URL: ${{ steps.urls.outputs.frontend_url }}
+          BACKEND_URL: ${{ steps.urls.outputs.backend_url }}
+          UPSTREAM_URL: ${{ steps.urls.outputs.upstream_url }}
+        # `timeout 300` enforces the 5-minute overall budget per R9.4
+        # and the task brief. The script's internal aggregator emits
+        # exactly one Structured_Error JSON line on failure (D1).
+        run: |
+          set +e
+          timeout 300 bash scripts/smoke_test.sh \
+            --frontend-url "$FRONTEND_URL" \
+            --backend-url  "$BACKEND_URL" \
+            --upstream-url "$UPSTREAM_URL"
+          rc=$?
+          if [[ $rc -eq 0 ]]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "result=failure" >> "$GITHUB_OUTPUT"
+          # Exit non-zero to mark this job as failed so the rollback and
+          # notify jobs are dispatched (per R9.5 / R9.6).
+          exit "$rc"
+
+  # ---------------------------------------------------------------------
+  # 3. Rollback on smoke failure (R9.5). Bounded to 10 minutes by the
+  #    task brief; rollback.sh restores `previous_image_tag` from the
+  #    deployment manifest (D3) and runs `alembic downgrade` when a
+  #    previous revision is recorded.
+  # ---------------------------------------------------------------------
+  rollback:
+    name: Rollback staging
+    needs: [resolve_image_tag, smoke_test]
+    if: ${{ always() && needs.resolve_image_tag.result == 'success' && needs.smoke_test.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve_image_tag.outputs.head_sha }}
+
+      - name: Write SSH private key
+        id: ssh_key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          key_path="${RUNNER_TEMP}/staging_ssh_key"
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          echo "key_path=${key_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Run rollback.sh
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_PRIVATE_KEY_PATH: ${{ steps.ssh_key.outputs.key_path }}
+          COMPOSE_FILE_PATH: /opt/uit/docker-compose.yml
+        run: bash scripts/deploy/rollback.sh
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f "${{ steps.ssh_key.outputs.key_path }}"
+
+      - name: Mark workflow as failed after rollback
+        # Even when rollback succeeds, the deploy itself failed; the
+        # workflow run conclusion must be `failure` per R9.5 so branch
+        # protection / alerting see the failed state.
+        run: |
+          echo "::error::Smoke test failed on staging; rollback executed. Failing the workflow run."
+          exit 1
+
+  # ---------------------------------------------------------------------
+  # 4. Notify DevOps_Engineer of any failed conclusion (R9.6). Bounded to
+  #    2 minutes per the task brief. Posts a JSON payload to
+  #    ${{ secrets.DEPLOY_FAILURE_WEBHOOK_URL }} naming the failing
+  #    component, stage, and run URL.
+  # ---------------------------------------------------------------------
+  notify:
+    name: Notify deploy failure
+    needs: [resolve_image_tag, deploy_frontend, deploy_backend, smoke_test, rollback]
+    if: ${{ always() && needs.resolve_image_tag.result == 'success' && (needs.smoke_test.result == 'failure' || needs.rollback.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Determine failing component(s)
+        id: triage
+        env:
+          FE_RESULT: ${{ needs.deploy_frontend.result }}
+          BE_RESULT: ${{ needs.deploy_backend.result }}
+          SMOKE_RESULT: ${{ needs.smoke_test.result }}
+          ROLLBACK_RESULT: ${{ needs.rollback.result }}
+        run: |
+          set -euo pipefail
+          components=()
+          if [[ "$FE_RESULT" == "failure" ]]; then
+            components+=("Admin_Frontend")
+          fi
+          if [[ "$BE_RESULT" == "failure" ]]; then
+            components+=("Admin_Backend+LightRAG_Service")
+          fi
+          if [[ "$SMOKE_RESULT" == "failure" ]]; then
+            components+=("smoke_test")
+          fi
+          if [[ "$ROLLBACK_RESULT" == "failure" ]]; then
+            components+=("rollback")
+          fi
+          if (( ${#components[@]} == 0 )); then
+            failing="unknown"
+          else
+            failing=$(IFS=,; printf '%s' "${components[*]}")
+          fi
+          echo "failing_component=${failing}" >> "$GITHUB_OUTPUT"
+
+      - name: Post deploy-failure webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_FAILURE_WEBHOOK_URL }}
+          STAGE: staging
+          FAILING_COMPONENT: ${{ steps.triage.outputs.failing_component }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          IMAGE_TAG: ${{ needs.resolve_image_tag.outputs.image_tag }}
+        # `--max-time 30` keeps the call comfortably inside the
+        # 2-minute step budget. A missing webhook URL is logged as a
+        # warning rather than a hard failure so a misconfigured
+        # secret cannot mask the underlying deploy failure.
+        run: |
+          set -euo pipefail
+          if [[ -z "${WEBHOOK_URL:-}" ]]; then
+            echo "::warning::DEPLOY_FAILURE_WEBHOOK_URL is not configured; skipping deploy-failure notification"
+            exit 0
+          fi
+          payload=$(jq -nc \
+            --arg stage             "$STAGE" \
+            --arg failing_component "$FAILING_COMPONENT" \
+            --arg run_url           "$RUN_URL" \
+            --arg sha               "$HEAD_SHA" \
+            --arg image_tag         "$IMAGE_TAG" \
+            '{
+              stage: $stage,
+              failing_component: $failing_component,
+              run_url: $run_url,
+              sha: $sha,
+              image_tag: $image_tag
+            }')
+          curl --max-time 30 \
+               -fsS \
+               -X POST \
+               -H 'Content-Type: application/json' \
+               --data "$payload" \
+               "$WEBHOOK_URL"

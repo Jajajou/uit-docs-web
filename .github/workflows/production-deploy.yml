@@ -1,0 +1,619 @@
+name: production-deploy
+
+# Production deploy workflow for the admin dashboard stack. Implements
+# task 13.4 of the cicd-deploy-admin-dashboard spec and design section C9.
+#
+# Triggers (Requirement 10.1):
+#   - push to a tag matching `v*` -> the tag name is the image tag.
+#   - workflow_dispatch with a required `image_tag` string input
+#     constrained to 1-128 characters.
+#
+# Concurrency (design C9): a single in-flight production deploy at a time.
+# `cancel-in-progress: false` ensures a queued tag push does not abort an
+# already-running deploy mid-rollout.
+#
+# Approval gate (Requirements 10.3, 10.4): the GitHub Environment named
+# `production` MUST be configured in repo settings with required reviewers
+# AND a wait-timer/timeout policy of 24 hours so the run is marked failed
+# when approval is not granted in time. The `environment:` directive below
+# binds the job to that gate. The job-level `timeout-minutes: 1440` is a
+# defense-in-depth backstop: once the runner picks the job up, the deploy
+# itself is bounded to 24h of wall-clock time so a stuck deploy fails closed.
+#
+# Canonical sequence (design C9):
+#   1. Resolve and validate image_tag.
+#   2. Configure SSH and read /etc/uit-docs/deployment.json.
+#   3. Refuse the run if image_tag == currently deployed tag (R10.2).
+#   4. Pre-write the new deployment manifest (transaction-log pattern) so
+#      `scripts/deploy/rollback.sh` can read `previous_image_tag` /
+#      `previous_alembic_revision` if any subsequent step fails.
+#   5. Write IMAGE_TAG into /opt/uit/.env on the host (chmod 600).
+#   6. `timeout 600 alembic upgrade head` over SSH (R12.5, R12.7).
+#   7. `docker compose pull`.
+#   8. `docker compose up -d admin_backend lightrag_uit` (R10.6).
+#   9. Poll `/healthz` on admin_backend and lightrag for at most 60s
+#      (R11.1, R11.2). If either host fails to return 2xx in 60s, the
+#      Vercel promotion is skipped and the rollback path runs.
+#  10. Promote the Vercel production deployment using VERCEL_TOKEN (R10.5).
+#  11. Run `scripts/smoke_test.sh` against the production URLs with the
+#      script's overall 30-second budget (R10.7).
+#  12. Capture the post-deploy alembic revision and persist it into the
+#      manifest so future rollbacks see the right `alembic_revision`.
+#  13. Post `gh api repos/.../deployments` with status=success and the run
+#      URL (R10.9).
+#
+# Failure handling (Requirements 10.8, 11.2, 11.3, 11.5, 12.6, 12.7, 12.8):
+#   - On any failure after step 5, run `scripts/deploy/rollback.sh`. The
+#     pre-written manifest from step 4 lets the script restore the previous
+#     image tag and (when present) `alembic downgrade <previous_revision>`.
+#   - When the Vercel promotion succeeded but a later step failed, run
+#     `vercel rollback` to demote it within the same 300s window.
+#   - On any failure conclusion, post a deploy-failure notification to
+#     DEPLOY_FAILURE_WEBHOOK_URL within 2 minutes.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Container image tag to deploy (1-128 chars, GHCR tag charset).'
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  # `id-token: write` is reserved for future Vercel/cosign OIDC flows but
+  # is not required by the current Vercel CLI invocation, which uses the
+  # VERCEL_TOKEN secret directly.
+
+jobs:
+  production-deploy:
+    name: production-deploy
+    runs-on: ubuntu-latest
+    # Bound the job to 24 hours so a stuck deploy fails closed. The waiting
+    # period (before approval) is governed by the GitHub Environment's
+    # wait-timer/required-reviewers configuration, not by this field.
+    timeout-minutes: 1440
+    environment:
+      name: production
+      url: ${{ secrets.PROD_FRONTEND_URL }}
+    env:
+      SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+      SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      PROD_FRONTEND_URL: ${{ secrets.PROD_FRONTEND_URL }}
+      PROD_BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
+      LANGGRAPH_UPSTREAM_URL: ${{ secrets.LANGGRAPH_UPSTREAM_URL }}
+      DEPLOY_FAILURE_WEBHOOK_URL: ${{ secrets.DEPLOY_FAILURE_WEBHOOK_URL }}
+      COMPOSE_FILE_PATH: /opt/uit/docker-compose.yml
+      REMOTE_ENV_PATH: /opt/uit/.env
+      REMOTE_MANIFEST_PATH: /etc/uit-docs/deployment.json
+      REMOTE_BACKEND_SERVICE: admin_backend
+      REMOTE_LIGHTRAG_SERVICE: lightrag_uit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------
+      # 1. Resolve and validate the image tag (R10.1).
+      # -----------------------------------------------------------------
+      - name: Resolve image tag
+        id: tag
+        env:
+          DISPATCH_INPUT: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            tag="${{ github.ref_name }}"
+            source="push:tag"
+          else
+            tag="${DISPATCH_INPUT:-}"
+            source="workflow_dispatch"
+          fi
+          if [[ -z "$tag" ]]; then
+            echo "::error title=Missing image_tag::image_tag is empty for ${source}"
+            exit 1
+          fi
+          if (( ${#tag} < 1 || ${#tag} > 128 )); then
+            echo "::error title=Invalid image_tag::length must be between 1 and 128 (got ${#tag})"
+            exit 1
+          fi
+          # Restrict to the OCI tag charset so the value can be spliced into
+          # remote shell commands and JSON without further quoting.
+          if [[ ! "$tag" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error title=Invalid image_tag::contains characters outside [A-Za-z0-9._-]"
+            exit 1
+          fi
+          echo "image_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "source=$source"   >> "$GITHUB_OUTPUT"
+          echo "Resolved image_tag=$tag (source=$source)"
+
+      # -----------------------------------------------------------------
+      # 2. Configure SSH for the production host.
+      # -----------------------------------------------------------------
+      - name: Configure SSH
+        id: ssh
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          key_path="$RUNNER_TEMP/prod_id"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          # Trust-on-first-use; production hostkeys should be pinned via
+          # the runbook for stronger guarantees.
+          ssh-keyscan -H "$SSH_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+          echo "key_path=$key_path" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------
+      # 3. Duplicate-tag guard (R10.2). Reads the host-side manifest and
+      #    refuses the run if the requested tag equals the currently
+      #    deployed tag. Also captures `previous_*` fields used by the
+      #    pre-deploy manifest write below so rollback.sh restores the
+      #    right state on failure.
+      # -----------------------------------------------------------------
+      - name: Read remote deployment manifest
+        id: manifest_read
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          read_script='
+            set -euo pipefail
+            if [ ! -f /etc/uit-docs/deployment.json ]; then
+              echo "image_tag="
+              echo "alembic_revision="
+              exit 0
+            fi
+            if command -v jq >/dev/null 2>&1; then
+              echo "image_tag=$(jq -r ".image_tag // \"\"" /etc/uit-docs/deployment.json)"
+              echo "alembic_revision=$(jq -r ".alembic_revision // \"\"" /etc/uit-docs/deployment.json)"
+            elif command -v python3 >/dev/null 2>&1; then
+              python3 - <<PY
+          import json
+          d = json.load(open("/etc/uit-docs/deployment.json"))
+          print(f"image_tag={d.get('"'"'image_tag'"'"','"'"''"'"')}")
+          print(f"alembic_revision={d.get('"'"'alembic_revision'"'"','"'"''"'"')}")
+          PY
+            else
+              echo "::error::neither jq nor python3 available on production host" >&2
+              exit 2
+            fi
+          '
+          out=$(ssh -i "$SSH_KEY" \
+                    -o BatchMode=yes \
+                    -o StrictHostKeyChecking=accept-new \
+                    -o ConnectTimeout=15 \
+                    "$SSH_USER@$SSH_HOST" "$read_script")
+          # Echo the raw output so an operator can see the manifest read.
+          printf '%s\n' "$out"
+          # Parse the key=value lines into step outputs.
+          while IFS= read -r line; do
+            case "$line" in
+              image_tag=*)        echo "current_image_tag=${line#image_tag=}"             >> "$GITHUB_OUTPUT" ;;
+              alembic_revision=*) echo "current_alembic_revision=${line#alembic_revision=}" >> "$GITHUB_OUTPUT" ;;
+            esac
+          done <<<"$out"
+
+      - name: Duplicate-tag guard
+        id: guard
+        env:
+          NEW_TAG:     ${{ steps.tag.outputs.image_tag }}
+          CURRENT_TAG: ${{ steps.manifest_read.outputs.current_image_tag }}
+        run: |
+          set -euo pipefail
+          echo "Requested image_tag = $NEW_TAG"
+          echo "Currently deployed  = ${CURRENT_TAG:-<none>}"
+          if [[ -n "$CURRENT_TAG" && "$CURRENT_TAG" == "$NEW_TAG" ]]; then
+            echo "::error title=Duplicate image_tag::image_tag '$NEW_TAG' is already deployed in production; refusing duplicate deploy (R10.2)"
+            exit 1
+          fi
+
+      # -----------------------------------------------------------------
+      # 4. Pre-write the deployment manifest (transaction-log pattern)
+      #    so rollback.sh restores `previous_image_tag` correctly on any
+      #    subsequent failure. `alembic_revision` is left empty here and
+      #    filled in after a successful upgrade in step 12.
+      # -----------------------------------------------------------------
+      - name: Pre-write deployment manifest
+        id: manifest_prewrite
+        env:
+          SSH_KEY:               ${{ steps.ssh.outputs.key_path }}
+          NEW_TAG:               ${{ steps.tag.outputs.image_tag }}
+          PREV_TAG:              ${{ steps.manifest_read.outputs.current_image_tag }}
+          PREV_ALEMBIC_REVISION: ${{ steps.manifest_read.outputs.current_alembic_revision }}
+        run: |
+          set -euo pipefail
+          deployed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          # Build the JSON locally so the remote shell does not need jq.
+          payload=$(python3 - <<PY
+          import json
+          print(json.dumps({
+              "image_tag": "${NEW_TAG}",
+              "previous_image_tag": "${PREV_TAG}",
+              "alembic_revision": "",
+              "previous_alembic_revision": "${PREV_ALEMBIC_REVISION}",
+              "deployed_at": "${deployed_at}",
+          }, separators=(",", ":")))
+          PY
+          )
+          # Pass the JSON to the remote shell on stdin to avoid quoting issues.
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "sudo mkdir -p /etc/uit-docs && \
+               tmp=\$(mktemp) && cat > \"\$tmp\" && \
+               sudo install -m 644 \"\$tmp\" $REMOTE_MANIFEST_PATH && \
+               rm -f \"\$tmp\"" <<<"$payload"
+          echo "Pre-deploy manifest written: image_tag=$NEW_TAG, previous_image_tag=${PREV_TAG:-<none>}"
+
+      # -----------------------------------------------------------------
+      # 5. Write IMAGE_TAG into /opt/uit/.env on the host (chmod 600).
+      # -----------------------------------------------------------------
+      - name: Write IMAGE_TAG to remote .env
+        id: write_env
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+          NEW_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "set -euo pipefail; \
+               sudo mkdir -p /opt/uit; \
+               tmp=\$(mktemp); \
+               if [ -f $REMOTE_ENV_PATH ]; then \
+                 grep -v -E '^[[:space:]]*IMAGE_TAG=' $REMOTE_ENV_PATH > \"\$tmp\" || true; \
+               fi; \
+               printf 'IMAGE_TAG=%s\n' '$NEW_TAG' >> \"\$tmp\"; \
+               sudo install -m 600 \"\$tmp\" $REMOTE_ENV_PATH; \
+               rm -f \"\$tmp\""
+
+      # -----------------------------------------------------------------
+      # 6. `timeout 600 alembic upgrade head` over SSH (R12.5, R12.7).
+      #    The host is expected to expose `alembic` either via a checked-out
+      #    repo or by running it inside the new admin_backend image; the
+      #    runbook documents the exact host-side invocation.
+      # -----------------------------------------------------------------
+      - name: Alembic upgrade head (timeout 600s)
+        id: alembic_upgrade
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "timeout 600 alembic upgrade head"
+
+      # -----------------------------------------------------------------
+      # 7. docker compose pull.
+      # -----------------------------------------------------------------
+      - name: docker compose pull
+        id: compose_pull
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "docker compose --env-file $REMOTE_ENV_PATH -f $COMPOSE_FILE_PATH pull"
+
+      # -----------------------------------------------------------------
+      # 8. docker compose up -d admin_backend lightrag_uit (R10.6).
+      # -----------------------------------------------------------------
+      - name: docker compose up -d (admin_backend, lightrag_uit)
+        id: compose_up
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "docker compose --env-file $REMOTE_ENV_PATH -f $COMPOSE_FILE_PATH up -d $REMOTE_BACKEND_SERVICE $REMOTE_LIGHTRAG_SERVICE"
+
+      # -----------------------------------------------------------------
+      # 9. Poll /healthz on admin_backend and lightrag for ≤60s
+      #    (R11.1, R11.2). On failure, the Vercel promotion is skipped
+      #    by virtue of `if: success()` on the Vercel step below.
+      # -----------------------------------------------------------------
+      - name: Poll admin_backend & lightrag /healthz (≤60s)
+        id: health
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" '
+            set -e
+            backend_ok=0
+            lightrag_ok=0
+            # 30 attempts at 2s spacing == 60s budget (R11.2).
+            for i in $(seq 1 30); do
+              if [ "$backend_ok" -eq 0 ] && \
+                 curl -fsS --max-time 3 http://localhost:8001/healthz >/dev/null 2>&1; then
+                backend_ok=1
+                echo "[health] admin_backend OK at attempt $i"
+              fi
+              if [ "$lightrag_ok" -eq 0 ] && \
+                 curl -fsS --max-time 3 http://localhost:9622/healthz >/dev/null 2>&1; then
+                lightrag_ok=1
+                echo "[health] lightrag_uit OK at attempt $i"
+              fi
+              if [ "$backend_ok" -eq 1 ] && [ "$lightrag_ok" -eq 1 ]; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "[health] FAIL: backend_ok=$backend_ok lightrag_ok=$lightrag_ok after 60s" >&2
+            exit 1
+          '
+
+      # -----------------------------------------------------------------
+      # 10. Vercel production promote (R10.5, R11.3). Skipped automatically
+      #     when any prior step failed (`if: success()`), satisfying R11.2.
+      # -----------------------------------------------------------------
+      - name: Setup Node.js for Vercel CLI
+        if: success()
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Vercel deploy (production promote)
+        id: vercel
+        if: success()
+        run: |
+          set -euo pipefail
+          # `vercel pull` materializes the production environment config so
+          # `vercel deploy --prod` promotes the prebuilt frontend image
+          # rather than building from source on the runner.
+          npx --yes vercel@latest pull --yes \
+            --environment=production \
+            --token="$VERCEL_TOKEN"
+          deploy_url=$(npx --yes vercel@latest deploy --prod --yes \
+            --token="$VERCEL_TOKEN")
+          echo "Vercel production deployment: $deploy_url"
+          echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------
+      # 11. Smoke test (R10.7, R10.8). The script enforces the 30-second
+      #     overall budget internally (design C12) and exits non-zero on
+      #     any non-2xx, timeout, DNS, TLS, or budget-exceeded failure.
+      # -----------------------------------------------------------------
+      - name: Smoke test (overall budget 30s)
+        id: smoke
+        if: success()
+        run: |
+          set -euo pipefail
+          chmod +x scripts/smoke_test.sh
+          scripts/smoke_test.sh \
+            --frontend-url "$PROD_FRONTEND_URL" \
+            --backend-url  "$PROD_BACKEND_URL" \
+            --upstream-url "$LANGGRAPH_UPSTREAM_URL"
+
+      # -----------------------------------------------------------------
+      # 12. Update the manifest with the post-deploy alembic revision so a
+      #     future rollback can downgrade to it (R12.6). Two passes:
+      #
+      #       a. capture_revision: query `alembic current` over SSH,
+      #          tolerate failure (container warming up, alembic absent),
+      #          publish the trimmed revision id as a step output.
+      #       b. persist_manifest: build the full D3 manifest locally and
+      #          rewrite it remotely via the same `cat | install` pattern
+      #          used in step 4 (manifest_prewrite). This avoids fragile
+      #          quoting and works whether or not the host has jq.
+      # -----------------------------------------------------------------
+      - name: Capture post-deploy alembic revision
+        id: capture_revision
+        if: success()
+        env:
+          SSH_KEY: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          # `alembic current` prints `<revision> (head)` on a line; we keep
+          # only the leading token. Failures (container not yet ready,
+          # alembic absent, exec returning non-zero) are intentionally
+          # swallowed: the deploy itself succeeded and the manifest will
+          # simply record an empty revision.
+          set +e
+          rev_out=$(ssh -i "$SSH_KEY" \
+                        -o BatchMode=yes \
+                        -o StrictHostKeyChecking=accept-new \
+                        -o ConnectTimeout=15 \
+                        "$SSH_USER@$SSH_HOST" \
+                        "docker compose --env-file $REMOTE_ENV_PATH -f $COMPOSE_FILE_PATH exec -T $REMOTE_BACKEND_SERVICE alembic current 2>/dev/null")
+          set -e
+          rev=$(printf '%s' "$rev_out" | head -n1 | awk '{print $1}')
+          case "$rev" in ''|INFO*|Revision*) rev="" ;; esac
+          # Sanitize the revision id to the alembic-supported charset so it
+          # can be embedded in a JSON document without escaping.
+          if [[ -n "$rev" && ! "$rev" =~ ^[A-Za-z0-9_]+$ ]]; then
+            echo "::warning title=Suspicious alembic revision::dropping unexpected value '$rev'"
+            rev=""
+          fi
+          echo "alembic_revision=$rev" >> "$GITHUB_OUTPUT"
+          echo "[manifest] captured alembic_revision=${rev:-<none>}"
+
+      - name: Persist post-deploy deployment manifest
+        id: manifest_finalize
+        if: success()
+        env:
+          SSH_KEY:               ${{ steps.ssh.outputs.key_path }}
+          NEW_TAG:               ${{ steps.tag.outputs.image_tag }}
+          PREV_TAG:              ${{ steps.manifest_read.outputs.current_image_tag }}
+          NEW_REVISION:          ${{ steps.capture_revision.outputs.alembic_revision }}
+          PREV_ALEMBIC_REVISION: ${{ steps.manifest_read.outputs.current_alembic_revision }}
+        run: |
+          set -euo pipefail
+          deployed_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          # Build the JSON locally so the remote shell does not need jq.
+          # All embedded variables are validated charsets (image tag, alembic
+          # revision) or trusted timestamps so json.dumps escaping is safe.
+          payload=$(python3 - <<PY
+          import json
+          print(json.dumps({
+              "image_tag": "${NEW_TAG}",
+              "previous_image_tag": "${PREV_TAG}",
+              "alembic_revision": "${NEW_REVISION}",
+              "previous_alembic_revision": "${PREV_ALEMBIC_REVISION}",
+              "deployed_at": "${deployed_at}",
+          }, separators=(",", ":")))
+          PY
+          )
+          ssh -i "$SSH_KEY" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "sudo mkdir -p /etc/uit-docs && \
+               tmp=\$(mktemp) && cat > \"\$tmp\" && \
+               sudo install -m 644 \"\$tmp\" $REMOTE_MANIFEST_PATH && \
+               rm -f \"\$tmp\"" <<<"$payload"
+          echo "[manifest] persisted: image_tag=$NEW_TAG previous_image_tag=${PREV_TAG:-<none>} alembic_revision=${NEW_REVISION:-<none>} previous_alembic_revision=${PREV_ALEMBIC_REVISION:-<none>}"
+
+      # -----------------------------------------------------------------
+      # 13. Post the GitHub Deployment status (R10.9) referencing the
+      #     deployed image tag and the run URL.
+      # -----------------------------------------------------------------
+      - name: Post GitHub Deployment status (success)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG:  ${{ steps.tag.outputs.image_tag }}
+          DEPLOY_URL: ${{ steps.vercel.outputs.deploy_url }}
+        run: |
+          set -euo pipefail
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          deployment_id=$(gh api \
+            "repos/${{ github.repository }}/deployments" \
+            -f ref="${{ github.sha }}" \
+            -f environment=production \
+            -f description="production deploy of $NEW_TAG" \
+            -F auto_merge=false \
+            -f required_contexts='[]' \
+            --jq '.id')
+          gh api \
+            "repos/${{ github.repository }}/deployments/$deployment_id/statuses" \
+            -f state=success \
+            -f description="image_tag=$NEW_TAG" \
+            -f environment_url="${DEPLOY_URL:-$PROD_FRONTEND_URL}" \
+            -f log_url="$run_url"
+          echo "Posted deployment status (id=$deployment_id) for image_tag=$NEW_TAG"
+
+      # -----------------------------------------------------------------
+      # Failure handlers (R10.8, R11.2, R11.3, R11.5, R12.6, R12.8).
+      #
+      # The rollback-host step uses scripts/deploy/rollback.sh, which reads
+      # the manifest pre-written in step 4 to determine `previous_image_tag`
+      # and `previous_alembic_revision`. It is gated on the deploy having
+      # actually mutated host state (compose_up reached at least an
+      # attempted state) so a guard-only failure is not amplified by an
+      # unnecessary rollback.
+      # -----------------------------------------------------------------
+      - name: Rollback host (image tag + alembic downgrade)
+        id: rollback_host
+        if: |
+          failure() &&
+          (steps.compose_up.conclusion != ''
+            || steps.alembic_upgrade.conclusion != ''
+            || steps.write_env.conclusion != '')
+        timeout-minutes: 5
+        env:
+          SSH_PRIVATE_KEY_PATH: ${{ steps.ssh.outputs.key_path }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/deploy/rollback.sh
+          scripts/deploy/rollback.sh
+
+      - name: Rollback Vercel production
+        id: rollback_vercel
+        if: failure() && steps.vercel.conclusion == 'success'
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # `vercel rollback` without an explicit URL reverts the project's
+          # production alias to the previous deployment.
+          npx --yes vercel@latest rollback --yes \
+            --token="$VERCEL_TOKEN"
+
+      - name: Post GitHub Deployment status (failure)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG:  ${{ steps.tag.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          deployment_id=$(gh api \
+            "repos/${{ github.repository }}/deployments" \
+            -f ref="${{ github.sha }}" \
+            -f environment=production \
+            -f description="failed production deploy of ${NEW_TAG:-unknown}" \
+            -F auto_merge=false \
+            -f required_contexts='[]' \
+            --jq '.id' || true)
+          if [[ -n "${deployment_id:-}" ]]; then
+            gh api \
+              "repos/${{ github.repository }}/deployments/$deployment_id/statuses" \
+              -f state=failure \
+              -f description="rollback executed; image_tag=${NEW_TAG:-unknown}" \
+              -f log_url="$run_url" || true
+          fi
+
+      - name: Notify deploy failure
+        if: failure()
+        timeout-minutes: 2
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DEPLOY_FAILURE_WEBHOOK_URL:-}" ]]; then
+            echo "::warning title=No webhook configured::DEPLOY_FAILURE_WEBHOOK_URL is empty; skipping notification"
+            exit 0
+          fi
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          payload=$(python3 - <<PY
+          import json
+          print(json.dumps({
+              "environment": "production",
+              "components": ["admin_backend", "lightrag_uit", "admin_frontend"],
+              "image_tag": "${NEW_TAG}" or "unknown",
+              "run_url": "${run_url}",
+              "failed_step": "production-deploy",
+          }, separators=(",", ":")))
+          PY
+          )
+          curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            --max-time 30 \
+            -d "$payload" \
+            "$DEPLOY_FAILURE_WEBHOOK_URL" || \
+            echo "::warning::Failure notification POST failed; continuing"

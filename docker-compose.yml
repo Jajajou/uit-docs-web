@@ -1,0 +1,202 @@
+# Production docker-compose for the UIT Admin Dashboard stack.
+#
+# Source of truth: this file is treated as the production Compose_File per
+# Requirements 16.1 and design C11. The development overlay lives at
+# `web/apps/admin-dashboard/docker-compose.yml` (Task 12.2).
+#
+# Image owner: occurrences of the literal token "<owner>" below are placeholders
+# for the GitHub Container Registry owner/org. The deployment automation
+# (scripts/deploy/ssh_deploy.sh, Task 13.1) substitutes "<owner>" with the
+# actual GHCR owner before invoking `docker compose pull`/`up`.
+#
+# Image tag: ${IMAGE_TAG} is supplied via /opt/uit/.env (written by the deploy
+# script) and identifies the release being run on this host.
+
+services:
+  # --------------------------------------------------------------------------
+  # Admin Dashboard backend (FastAPI) — listens on 8001 (R16.3, design C11).
+  # --------------------------------------------------------------------------
+  admin_backend:
+    container_name: admin_backend
+    image: ghcr.io/<owner>/admin_backend:${IMAGE_TAG}
+    env_file: /opt/uit/.env
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres_uit:
+        condition: service_started
+      lightrag_uit:
+        condition: service_started
+    restart: unless-stopped                       # R16.2, R17.3
+    stop_grace_period: 30s                        # R16.6, R16.7
+    healthcheck:                                  # R16.3
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    logging:                                      # R17.1
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+  # --------------------------------------------------------------------------
+  # Admin Dashboard frontend (React 19 + Vite, served by nginx) — port 80.
+  # --------------------------------------------------------------------------
+  admin_frontend:
+    container_name: admin_frontend
+    image: ghcr.io/<owner>/admin_frontend:${IMAGE_TAG}
+    env_file: /opt/uit/.env
+    ports:
+      - "80:80"
+    depends_on:
+      admin_backend:
+        condition: service_started
+    restart: unless-stopped                       # R16.2, R17.3
+    stop_grace_period: 30s                        # R16.6, R16.7
+    healthcheck:                                  # R16.4
+      test: ["CMD", "curl", "-fsS", "http://localhost/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    logging:                                      # R17.1
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+  # --------------------------------------------------------------------------
+  # LightRAG retrieval service — internal port 9621, exposed on host 9622
+  # (preserves existing convention).
+  # --------------------------------------------------------------------------
+  lightrag_uit:
+    container_name: lightrag_uit
+    image: ghcr.io/<owner>/lightrag:${IMAGE_TAG}
+    env_file: /opt/uit/.env
+    ports:
+      - "9622:9621"
+    depends_on:
+      postgres_uit:
+        condition: service_started
+      qdrant_uit:
+        condition: service_started
+    volumes:
+      - ./data/rag_storage:/app/data/rag_storage
+      - ./data/inputs:/app/data/inputs
+      - ./data/tiktoken:/app/data/tiktoken
+      - ./LightRAG/lightrag/prompt.py:/app/lightrag/prompt.py:ro
+      - ./LightRAG/lightrag/llm/openai.py:/app/lightrag/llm/openai.py:ro
+    environment:
+      - TIKTOKEN_CACHE_DIR_DOC=./data/tiktoken
+    restart: unless-stopped                       # R16.2, R17.3
+    stop_grace_period: 30s                        # R16.6, R16.7
+    logging:                                      # R17.1
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+  # --------------------------------------------------------------------------
+  # Public LightRAG instance (existing service, preserved). Not part of the
+  # five canonical services in design C11 but retained for parity with the
+  # current production deployment.
+  # --------------------------------------------------------------------------
+  lightrag_public_uit:
+    container_name: lightrag_public_uit
+    image: ghcr.io/<owner>/lightrag:${IMAGE_TAG}
+    env_file: /opt/uit/.env
+    ports:
+      - "9623:9621"
+    depends_on:
+      postgres_uit:
+        condition: service_started
+      qdrant_uit:
+        condition: service_started
+    volumes:
+      - ./data/rag_storage:/app/data/rag_storage
+      - ./data/inputs:/app/data/inputs
+      - ./data/tiktoken:/app/data/tiktoken
+      - ./LightRAG/lightrag/prompt.py:/app/lightrag/prompt.py:ro
+      - ./LightRAG/lightrag/llm/openai.py:/app/lightrag/llm/openai.py:ro
+    environment:
+      - TIKTOKEN_CACHE_DIR_DOC=./data/tiktoken
+      - WORKSPACE=public
+      - WEBUI_TITLE=LightRAG UIT Public
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL with pgvector — host port 5433 (preserves existing convention).
+  # No application healthcheck declared (per task scope: spec does not require
+  # one for postgres_uit). Restart/logging applied per R17.1, R17.3.
+  # --------------------------------------------------------------------------
+  postgres_uit:
+    container_name: postgres_uit
+    image: pgvector/pgvector:pg16
+    env_file: /opt/uit/.env
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: lightrag
+    volumes:
+      - ./data/pg_data:/var/lib/postgresql/data
+      - ./docker/init-admin-dashboard-db.sql:/docker-entrypoint-initdb.d/20-admin-dashboard.sql:ro
+    restart: unless-stopped                       # R16.2, R17.3
+    stop_grace_period: 30s                        # R16.6, R16.7
+    logging:                                      # R17.1
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+  # --------------------------------------------------------------------------
+  # Qdrant vector database — host ports 6336 (HTTP) and 6337 (gRPC) preserve
+  # existing convention. Image-level healthcheck retained from current setup.
+  # --------------------------------------------------------------------------
+  qdrant_uit:
+    container_name: qdrant_uit
+    image: qdrant/qdrant:latest
+    env_file: /opt/uit/.env
+    ports:
+      - "6336:6333"
+      - "6337:6334"
+    volumes:
+      - ./data/qdrant_data_v2:/qdrant/storage
+    restart: unless-stopped                       # R16.2, R17.3
+    stop_grace_period: 30s                        # R16.6, R16.7
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "bash -lc \"exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3\""
+      interval: 3s
+      timeout: 2s
+      retries: 40
+      start_period: 5s
+    logging:                                      # R17.1
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - uit_network
+
+networks:
+  uit_network:
+    name: uit_network

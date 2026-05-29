@@ -1,0 +1,115 @@
+name: e2e-live
+
+# Daily live end-to-end run against the deployed admin backend and the
+# LangGraph upstream. Implements task 5.1 of the cicd-deploy-admin-dashboard
+# spec and design section C5.
+#
+# Three sequential phases inside a single job (so the
+# skip-vs-failure distinction from R6.5 / R6.7 is decidable from this file
+# alone):
+#   1. Fail-fast guard on the LANGGRAPH_UPSTREAM_URL secret (R6.3).
+#   2. Upstream /ok probe with a 5-second total budget. A non-2xx or
+#      timeout exits the job with status 0 and skips the Playwright step
+#      via the `should_run_playwright` output (R6.5).
+#   3. Playwright live run gated on the probe output, capped at 30 minutes
+#      (R6.6 / R6.7).
+# The artifact upload is `if: always() && steps.<probe>.outputs.should_run_playwright == 'true'`
+# so the report is preserved on Playwright pass *or* fail, but not when the
+# upstream was unavailable.
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-live
+  cancel-in-progress: true
+
+jobs:
+  e2e-live:
+    name: e2e-live
+    runs-on: ubuntu-latest
+    # Outer budget covers checkout, npm ci, browser install, and the
+    # 30-minute Playwright cap enforced at the step level below (R6.6).
+    timeout-minutes: 45
+    env:
+      LANGGRAPH_UPSTREAM_URL: ${{ secrets.LANGGRAPH_UPSTREAM_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Step 1: secret guard (R6.3) -------------------------------------
+      # Empty/unset secret is a workflow failure with the exact annotation
+      # text required by the spec. No upstream probe or Playwright step
+      # runs.
+      - name: Verify LANGGRAPH_UPSTREAM_URL secret is present
+        run: |
+          if [ -z "${LANGGRAPH_UPSTREAM_URL}" ]; then
+            echo "::error title=LANGGRAPH_UPSTREAM_URL secret missing::LANGGRAPH_UPSTREAM_URL is unset or empty"
+            exit 1
+          fi
+
+      # --- Step 2: upstream probe (R6.4 / R6.5) ----------------------------
+      # LangGraph exposes /ok as the stable public health endpoint. -f makes
+      # curl exit non-zero on HTTP >= 400, -sS
+      # keeps logs quiet while still surfacing real errors. The step always
+      # exits 0; the probe outcome is communicated downstream via the
+      # `should_run_playwright` output so a flaky Tailscale endpoint never
+      # produces a noisy red workflow.
+      - name: Probe LangGraph upstream /ok
+        id: upstream_probe
+        run: |
+          set +e
+          curl --max-time 5 -fsS "${LANGGRAPH_UPSTREAM_URL}/ok" >/dev/null
+          status=$?
+          set -e
+          if [ "${status}" -eq 0 ]; then
+            echo "should_run_playwright=true" >> "${GITHUB_OUTPUT}"
+            echo "LangGraph upstream healthy; Playwright will run."
+          else
+            echo "should_run_playwright=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice title=LangGraph upstream unavailable::curl exited with status ${status} probing /ok; Playwright skipped"
+          fi
+
+      # --- Step 3: Playwright live run (R6.6 / R6.7) -----------------------
+      # Only runs when the probe reported a 2xx. The 30-minute cap is
+      # enforced at the step level so a hanging test produces `failure`,
+      # which is distinct from the skip path above (R6.7 / CP-7).
+      - name: Setup Node.js 20
+        if: steps.upstream_probe.outputs.should_run_playwright == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/apps/admin-dashboard/frontend/package-lock.json
+
+      - name: Install frontend dependencies (npm ci)
+        if: steps.upstream_probe.outputs.should_run_playwright == 'true'
+        working-directory: web/apps/admin-dashboard/frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.upstream_probe.outputs.should_run_playwright == 'true'
+        working-directory: web/apps/admin-dashboard/frontend
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright live tests
+        id: playwright
+        if: steps.upstream_probe.outputs.should_run_playwright == 'true'
+        timeout-minutes: 30
+        working-directory: web/apps/admin-dashboard/frontend
+        run: npx playwright test -c playwright.live.config.ts
+
+      # --- Always-step: upload report (R6.6) -------------------------------
+      # Conjunction with the probe output preserves the skip-vs-failure
+      # distinction: on the upstream-unavailable path no report exists and
+      # nothing is uploaded; on Playwright pass *or* fail the report is
+      # always retained for 14 days.
+      - name: Upload playwright-report artifact
+        if: always() && steps.upstream_probe.outputs.should_run_playwright == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: web/apps/admin-dashboard/frontend/playwright-report
+          retention-days: 14

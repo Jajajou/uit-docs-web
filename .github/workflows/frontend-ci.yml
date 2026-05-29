@@ -1,0 +1,78 @@
+name: frontend-ci
+
+# Quality-gate CI for the admin dashboard frontend.
+# Implements task 3.1 of the cicd-deploy-admin-dashboard spec and design C2.
+# Triggers, concurrency, sequential steps, and artifact uploads are
+# decidable from this file alone (see design CP-7).
+
+on:
+  pull_request:
+    paths:
+      - 'web/apps/admin-dashboard/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/apps/admin-dashboard/frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-ci:
+    name: frontend-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web/apps/admin-dashboard/frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/apps/admin-dashboard/frontend/package-lock.json
+
+      # Sequential quality-gate steps. Each step relies on GitHub Actions'
+      # default success-gating: a non-zero exit on any step halts the job
+      # and marks the workflow run conclusion as `failure` (R2.3, R2.4).
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests (vitest, single run)
+        run: npm run test -- --run
+
+      - name: Upload coverage artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-frontend-coverage-${{ github.sha }}
+          path: web/apps/admin-dashboard/frontend/coverage
+          retention-days: 14
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-frontend-dist-${{ github.sha }}
+          path: web/apps/admin-dashboard/frontend/dist
+          retention-days: 14
+
+      - name: Playwright mock end-to-end tests
+        run: npm run test:e2e:mock

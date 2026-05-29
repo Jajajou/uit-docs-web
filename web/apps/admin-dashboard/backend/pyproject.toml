@@ -1,0 +1,79 @@
+[project]
+name = "admin-dashboard-api"
+version = "0.1.0"
+description = "Admin Dashboard API for UIT_DOCS_AGENT - FastAPI middleware for document upload and management"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "python-dotenv>=1.0.1",
+    "httpx>=0.27.0",
+    "requests>=2.31.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "aiofiles>=24.1.0",
+    "sqlalchemy>=2.0.0",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.13.0",
+]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.1.1",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api"]
+
+[tool.ruff]
+line-length = 160
+lint.select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+addopts = "-q -p no:cacheprovider"
+testpaths = [
+    "tests",
+    "tests/api",
+    "tests/cicd",
+    "tests/core",
+    "tests/scripts",
+    "tests/migrations",
+    "tests/middleware",
+]
+markers = [
+    "integration: smoke and environment-dependent tests against external services such as Postgres",
+]
+norecursedirs = [
+    ".pytest_cache",
+    "pytest-cache-files-*",
+    ".local_site",
+    ".pydeps",
+    "pydeps_conda",
+    "pydeps_runtime",
+    ".venv_check",
+    ".venv_live",
+    "tmp_test_db",
+    "tmp_virtualenv",
+    "uploads",
+    "data",
+    "__pycache__",
+]
+
+[tool.coverage.run]
+source = ["api"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 85

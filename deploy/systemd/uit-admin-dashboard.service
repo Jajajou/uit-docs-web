@@ -1,0 +1,69 @@
+# deploy/systemd/uit-admin-dashboard.service
+#
+# Boot-on-host unit for the UIT admin-dashboard docker-compose stack.
+# Per design.md C11 (Boot-on-host, R17.2) this unit brings the full
+# compose stack up at multi-user.target on system boot, expected to
+# complete within 180 seconds.
+#
+# Runbook installation:
+#   1. install -m 0644 deploy/systemd/uit-admin-dashboard.service /etc/systemd/system/
+#   2. systemctl daemon-reload
+#   3. systemctl enable --now uit-admin-dashboard.service
+#
+# Verify with:
+#   systemctl status uit-admin-dashboard.service
+#
+# See design.md section C11 ("Docker-compose supervisor (R16, R17)")
+# for the canonical lifecycle. The TimeoutStopSec=45s setting leaves a
+# 15-second margin above the compose-level `stop_grace_period: 30s`
+# applied to each service (R16.6, R16.7).
+
+[Unit]
+Description=UIT admin-dashboard docker-compose stack
+Documentation=https://github.com/uit/admin-dashboard/blob/main/.kiro/specs/cicd-deploy-admin-dashboard/design.md
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+# `oneshot` + `RemainAfterExit=yes`: `docker compose up -d` returns as
+# soon as the containers are started in the background. Without
+# RemainAfterExit, systemd would consider the unit "inactive (dead)"
+# the moment ExecStart finished, which is misleading because the
+# stack is still running. With it, `systemctl status` reports
+# "active (exited)" until ExecStop is invoked.
+Type=oneshot
+RemainAfterExit=yes
+
+# The `uit` deploy user is expected to be a member of the `docker`
+# group so it can talk to the docker socket without root.
+User=uit
+Group=docker
+
+WorkingDirectory=/opt/uit
+
+# `-` prefix makes the env file optional; the unit must still start
+# on a freshly provisioned host before .env has been written by the
+# deploy script (scripts/deploy/ssh_deploy.sh writes it on first
+# successful deploy).
+EnvironmentFile=-/opt/uit/.env
+
+ExecStart=/usr/bin/docker compose -f /opt/uit/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/uit/docker-compose.yml down
+
+# 45s = 30s compose stop_grace_period + 15s margin (design C11,
+# Graceful shutdown).
+TimeoutStopSec=45s
+
+# Retry `up -d` if the docker daemon was not yet ready when the unit
+# first ran. `oneshot` honors Restart=on-failure: the unit will be
+# re-run if ExecStart exits non-zero.
+Restart=on-failure
+RestartSec=10s
+
+# Send all output to journald so operators can use
+# `journalctl -u uit-admin-dashboard.service`.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

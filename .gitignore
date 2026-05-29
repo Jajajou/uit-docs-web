@@ -1,0 +1,78 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv*/
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.local_site/
+.pydeps/
+pydeps_*/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+.npm-cache/
+coverage/
+.playwright-cli/
+playwright-report/
+test-results/
+storybook-static/
+
+# Logs and temp
+*.log
+tmp-*.out.log
+tmp-*.err.log
+backend-dev.*.log
+frontend-dev.*.log
+dev_*.log
+tmp/
+tmp_*/
+output/
+data/
+.tmp/
+
+# Vercel / Render
+.vercel/
+.render/
+tmp-vercel-*/
+
+# Env / secrets
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+.codex/
+
+# Backend uploads / runtime data
+web/apps/admin-dashboard/backend/uploads/
+web/apps/admin-dashboard/backend/data/
+web/apps/admin-dashboard/backend/tmp_test_db/
+web/apps/admin-dashboard/backend/.env
+web/apps/admin-dashboard/backend/pytest-cache-files-*/
+
+# Misc
+.kiro/tasks/

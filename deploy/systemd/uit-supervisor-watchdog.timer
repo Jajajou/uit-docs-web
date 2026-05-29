@@ -1,0 +1,29 @@
+# deploy/systemd/uit-supervisor-watchdog.timer
+#
+# Drives uit-supervisor-watchdog.service every 30 seconds, with a 60s
+# delay after boot to let the docker-compose stack settle before the
+# first watchdog pass.
+#
+# Per design C11 ("Restart-loop backoff (R16.8)"): the watchdog timer
+# fires every 30 seconds and the watchdog script inspects a rolling
+# 60-second window of `docker events` per service.
+
+[Unit]
+Description=UIT admin-dashboard restart-loop watchdog (timer)
+Documentation=https://github.com/uit/admin-dashboard/blob/main/.kiro/specs/cicd-deploy-admin-dashboard/design.md
+Requires=uit-supervisor-watchdog.service
+
+[Timer]
+# First run 60s after boot so docker-compose has time to start the stack.
+OnBootSec=60s
+# Re-run every 30s after the previous activation, regardless of how
+# long the previous pass took.
+OnUnitActiveSec=30s
+# Catch up on missed runs if the host was offline or busy.
+Persistent=true
+# Bind explicitly to the matching service unit name.
+Unit=uit-supervisor-watchdog.service
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

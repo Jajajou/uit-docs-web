@@ -1,0 +1,77 @@
+name: langgraph-ci
+
+# CI gate for the LangGraph subtree (R4.1, R4.2, R4.3).
+#
+# Design note (design.md C4):
+#   The preferred implementation is to call the LangGraph repo's own
+#   reusable workflows via `uses: ./LangGraph/.github/workflows/unit-tests.yml`
+#   (and `integration-tests.yml`). Those workflows currently only declare
+#   `on: [push, pull_request, workflow_dispatch]` and do *not* declare
+#   `on: workflow_call`, so they cannot be invoked as reusable workflows
+#   from this gate. We therefore use the documented fallback (R4.2):
+#   a single job that runs `pytest LangGraph/tests` from the repository
+#   root using the Python version declared in
+#   `LangGraph/.github/workflows/unit-tests.yml` (matrix entries
+#   `["3.11", "3.12"]` — we pin to 3.11 here, matching the wider
+#   admin-dashboard backend toolchain).
+#
+#   If the LangGraph upstream later adds `on: workflow_call`, swap the
+#   `unit-tests` and `integration-tests` jobs below for `uses:` calls
+#   and drop the local pytest setup.
+
+on:
+  pull_request:
+    paths:
+      - "LangGraph/**"
+      - ".github/workflows/langgraph-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "LangGraph/**"
+      - ".github/workflows/langgraph-ci.yml"
+
+concurrency:
+  group: langgraph-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  langgraph-tests:
+    name: LangGraph unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install LangGraph dependencies
+        working-directory: LangGraph
+        run: |
+          set -euo pipefail
+          uv venv
+          uv pip install -r pyproject.toml
+          uv pip install pytest
+
+      - name: Run LangGraph unit tests
+        working-directory: LangGraph
+        run: |
+          set -euo pipefail
+          uv run pytest tests/unit_tests

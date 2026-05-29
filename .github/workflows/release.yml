@@ -1,0 +1,164 @@
+name: release
+
+# GitHub Release workflow for the admin dashboard. Implements task 7.1 of
+# the cicd-deploy-admin-dashboard spec and design section C7.
+#
+# Trigger envelope (Requirements 1.8, 8.1):
+#   push of any tag matching `v*` creates a GitHub Release whose name and
+#   tag both equal the pushed tag. The trigger is a tag-only `push`
+#   filter, intentionally independent of every CI Path_Filter so that a
+#   release tag always advances regardless of which paths changed in the
+#   tagged commit.
+#
+# Failure semantics (Requirements 8.2, 8.3):
+#   The single job below makes one attempt to call the GitHub release-
+#   notes generation API and one attempt to create the release with
+#   `gh release create`. Any non-zero exit from either call fails the
+#   workflow run, leaves the underlying tag in place, and does not retry
+#   automatically — the operator can re-run the workflow manually after
+#   investigating the API error.
+#
+# Time budget (Requirement 8.1, design C7):
+#   The job-level `timeout-minutes: 2` enforces the 120-second budget
+#   from trigger to `gh release create` invocation; checkout, the API
+#   call, and the release creation each take well under 30 seconds in
+#   practice so the budget is comfortable on a clean ubuntu-latest
+#   runner.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  # Releases are produced once per immutable tag ref. Cancelling an
+  # earlier in-flight run on the same tag is safe because the second
+  # run will issue an identical API call against the same `tag_name`.
+  cancel-in-progress: true
+
+permissions:
+  # `contents: write` is required to create the GitHub Release object
+  # and to read the underlying tag history for `git describe` and the
+  # release-notes generation API.
+  contents: write
+
+jobs:
+  release:
+    name: create-github-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history is required so `git describe --tags --abbrev=0
+          # --match "v*" HEAD~1` can resolve the previous matching tag
+          # for the changelog window (Requirements 8.4, 8.5; design C7
+          # step 1). A shallow checkout would cause `git describe` to
+          # exit non-zero with `fatal: No names found` and force the
+          # workflow into the first-release path even when prior tags
+          # exist.
+          fetch-depth: 0
+
+      - name: Resolve previous matching tag
+        id: prev_tag
+        # Find the most recent tag matching the `v*` pattern reachable
+        # from HEAD~1 (i.e. the parent of the tagged commit). The
+        # trailing `|| true` swallows the non-zero exit `git describe`
+        # produces when no prior matching tag exists; in that case the
+        # output is the empty string and the subsequent API call falls
+        # through to the first-release path (Requirement 8.5).
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREV_TAG="$(git describe --tags --abbrev=0 --match 'v*' HEAD~1 2>/dev/null || true)"
+          echo "previous_tag=${PREV_TAG}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$PREV_TAG" ]]; then
+            echo "Previous matching tag: ${PREV_TAG}"
+          else
+            echo "No previous matching tag found; first release path."
+          fi
+
+      - name: Generate release notes
+        id: generate_notes
+        # Calls the GitHub-native release-notes generation API
+        # (Requirements 8.4, 8.5; design C7 step 2). When
+        # `previous_tag_name` is supplied the API returns notes for the
+        # commit window between that tag and the new tag; when it is
+        # empty the API returns notes for all commits reachable from
+        # the new tag. A non-zero exit from `gh api` (auth error,
+        # rate limit, network failure) fails this step and therefore
+        # the workflow run, with no retry (Requirements 8.2, 8.3).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREV_TAG: ${{ steps.prev_tag.outputs.previous_tag }}
+          TAG_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$PREV_TAG" ]]; then
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${REPO}/releases/generate-notes" \
+              -f tag_name="${TAG_NAME}" \
+              -f previous_tag_name="${PREV_TAG}" \
+              --jq .body > notes.md
+          else
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${REPO}/releases/generate-notes" \
+              -f tag_name="${TAG_NAME}" \
+              --jq .body > notes.md
+          fi
+          # Guard against an empty body that would produce a confusing
+          # release page; emit a stable placeholder instead so the
+          # downstream image-references section still appears.
+          if [[ ! -s notes.md ]]; then
+            printf '_No changelog entries detected for this release._\n' > notes.md
+          fi
+
+      - name: Build release body
+        id: build_body
+        # Append a fenced-code section listing the published image
+        # references for this tag (Requirement 8.6; design C7 step 3).
+        # GHCR repository names are case-sensitive lowercase, so the
+        # repository_owner is downcased before being interpolated.
+        env:
+          OWNER: ${{ github.repository_owner }}
+          TAG_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          {
+            cat notes.md
+            printf '\n## Container Images\n\n'
+            printf '```\n'
+            printf 'ghcr.io/%s/admin_backend:%s\n'  "$OWNER_LC" "$TAG_NAME"
+            printf 'ghcr.io/%s/admin_frontend:%s\n' "$OWNER_LC" "$TAG_NAME"
+            printf 'ghcr.io/%s/lightrag:%s\n'       "$OWNER_LC" "$TAG_NAME"
+            printf '```\n'
+          } > body.md
+
+      - name: Create GitHub Release
+        id: create_release
+        # Single, no-retry invocation of `gh release create` (design C7
+        # step 4; Requirements 8.1, 8.2, 8.3). The release `name` and
+        # `tag` both equal the pushed tag (Requirement 8.1). On any
+        # non-zero exit (API error, insufficient permissions) this step
+        # fails the workflow with no automatic retry, and the underlying
+        # tag stays in place for a manual re-run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${TAG_NAME}" \
+            --title "${TAG_NAME}" \
+            --notes-file body.md

@@ -1,0 +1,340 @@
+name: ci-idempotency
+
+# Daily scheduled replay of the three quality-gate workflows
+# (frontend-ci, backend-ci, langgraph-ci) against a small set of canonical
+# commits. For each (workflow, commit) pair, the test invocation is run
+# twice on the SAME runner image with the SAME lockfiles. The workflow
+# fails if the two passes disagree on:
+#   * conclusion (exit code class: success vs failure)
+#   * test name set (extracted from JUnit XML)
+#   * artifact filename set (built outputs / coverage reports)
+#
+# Implements task 14.1 of the cicd-deploy-admin-dashboard spec and
+# Property 8 / CP-1 in design.md ("CI Idempotency").
+# Validates Requirements 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3.
+
+on:
+  schedule:
+    # 05:00 UTC daily (off-peak for `ubuntu-latest` runners).
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      canonical_commits:
+        description: >-
+          Comma-separated list of commit SHAs to replay. When empty, the
+          workflow replays the latest commit on `main`.
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: ci-idempotency
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-commits:
+    name: Resolve canonical commit set
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commits: ${{ steps.resolve.outputs.commits }}
+    steps:
+      - name: Checkout main (full history)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Build commit matrix
+        id: resolve
+        shell: bash
+        env:
+          INPUT_COMMITS: ${{ inputs.canonical_commits }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_COMMITS:-}" ]]; then
+            raw="${INPUT_COMMITS}"
+          else
+            raw="$(git rev-parse HEAD)"
+          fi
+          commits_json=$(printf '%s' "$raw" | tr ',' '\n' | awk 'NF' | jq -R . | jq -sc .)
+          echo "Replaying commits: ${commits_json}"
+          echo "commits=${commits_json}" >> "$GITHUB_OUTPUT"
+
+  replay-frontend-ci:
+    name: frontend-ci replay @ ${{ matrix.commit }}
+    needs: resolve-commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.resolve-commits.outputs.commits) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          fetch-depth: 1
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/apps/admin-dashboard/frontend/package-lock.json
+
+      - name: Install dependencies (npm ci)
+        working-directory: web/apps/admin-dashboard/frontend
+        run: npm ci
+
+      - name: Replay pass A (vitest + build)
+        id: pass_a
+        continue-on-error: true
+        working-directory: web/apps/admin-dashboard/frontend
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-a
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          npx vitest run \
+            --reporter=junit \
+            --outputFile "$REPLAY_DIR/vitest.junit.xml"
+          test_rc=$?
+          npm run build
+          build_rc=$?
+          set -e
+          # Capture artifact filename listing (relative paths, sorted).
+          ( cd dist && find . -type f | LC_ALL=C sort ) > "$REPLAY_DIR/artifacts.txt" 2>/dev/null || true
+          # Conclusion = success iff both vitest and build returned 0.
+          if [[ $test_rc -eq 0 && $build_rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+          # Clean dist between passes so artifact comparison is meaningful.
+          rm -rf dist
+
+      - name: Replay pass B (vitest + build)
+        id: pass_b
+        continue-on-error: true
+        working-directory: web/apps/admin-dashboard/frontend
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-b
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          npx vitest run \
+            --reporter=junit \
+            --outputFile "$REPLAY_DIR/vitest.junit.xml"
+          test_rc=$?
+          npm run build
+          build_rc=$?
+          set -e
+          ( cd dist && find . -type f | LC_ALL=C sort ) > "$REPLAY_DIR/artifacts.txt" 2>/dev/null || true
+          if [[ $test_rc -eq 0 && $build_rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+
+      - name: Diff replay summaries
+        env:
+          A_DIR: ${{ runner.temp }}/replay-a
+          B_DIR: ${{ runner.temp }}/replay-b
+          REPLAYED_WORKFLOW: frontend-ci
+          REPLAYED_COMMIT: ${{ matrix.commit }}
+        run: ./scripts/ci/idempotency_diff.sh
+
+  replay-backend-ci:
+    name: backend-ci replay @ ${{ matrix.commit }}
+    needs: resolve-commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.resolve-commits.outputs.commits) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          fetch-depth: 1
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            web/apps/admin-dashboard/backend/requirements.txt
+            web/apps/admin-dashboard/backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: web/apps/admin-dashboard/backend
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Replay pass A (pytest + coverage)
+        id: pass_a
+        continue-on-error: true
+        working-directory: web/apps/admin-dashboard/backend
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-a
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          pytest \
+            --cov=app \
+            --cov-report=xml \
+            --junitxml "$REPLAY_DIR/pytest.junit.xml"
+          rc=$?
+          set -e
+          # Artifact filename listing (coverage.xml + any other test outputs).
+          ( find . -maxdepth 2 -type f \
+              \( -name 'coverage.xml' -o -name '.coverage' -o -name 'junit.xml' \) \
+            | LC_ALL=C sort ) > "$REPLAY_DIR/artifacts.txt"
+          if [[ $rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+          # Reset coverage state between passes so each run starts clean.
+          rm -f coverage.xml .coverage
+
+      - name: Replay pass B (pytest + coverage)
+        id: pass_b
+        continue-on-error: true
+        working-directory: web/apps/admin-dashboard/backend
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-b
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          pytest \
+            --cov=app \
+            --cov-report=xml \
+            --junitxml "$REPLAY_DIR/pytest.junit.xml"
+          rc=$?
+          set -e
+          ( find . -maxdepth 2 -type f \
+              \( -name 'coverage.xml' -o -name '.coverage' -o -name 'junit.xml' \) \
+            | LC_ALL=C sort ) > "$REPLAY_DIR/artifacts.txt"
+          if [[ $rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+
+      - name: Diff replay summaries
+        env:
+          A_DIR: ${{ runner.temp }}/replay-a
+          B_DIR: ${{ runner.temp }}/replay-b
+          REPLAYED_WORKFLOW: backend-ci
+          REPLAYED_COMMIT: ${{ matrix.commit }}
+        run: ./scripts/ci/idempotency_diff.sh
+
+  replay-langgraph-ci:
+    name: langgraph-ci replay @ ${{ matrix.commit }}
+    needs: resolve-commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.resolve-commits.outputs.commits) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          fetch-depth: 1
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install LangGraph dependencies
+        working-directory: LangGraph
+        run: |
+          set -euo pipefail
+          uv venv
+          uv pip install -r pyproject.toml
+          uv pip install pytest
+
+      - name: Replay pass A (pytest)
+        id: pass_a
+        continue-on-error: true
+        working-directory: LangGraph
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-a
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          uv run pytest tests/unit_tests \
+            --junitxml "$REPLAY_DIR/pytest.junit.xml"
+          rc=$?
+          set -e
+          : > "$REPLAY_DIR/artifacts.txt"
+          if [[ $rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+
+      - name: Replay pass B (pytest)
+        id: pass_b
+        continue-on-error: true
+        working-directory: LangGraph
+        env:
+          REPLAY_DIR: ${{ runner.temp }}/replay-b
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPLAY_DIR"
+          set +e
+          uv run pytest tests/unit_tests \
+            --junitxml "$REPLAY_DIR/pytest.junit.xml"
+          rc=$?
+          set -e
+          : > "$REPLAY_DIR/artifacts.txt"
+          if [[ $rc -eq 0 ]]; then
+            echo "success" > "$REPLAY_DIR/conclusion.txt"
+          else
+            echo "failure" > "$REPLAY_DIR/conclusion.txt"
+          fi
+
+      - name: Diff replay summaries
+        env:
+          A_DIR: ${{ runner.temp }}/replay-a
+          B_DIR: ${{ runner.temp }}/replay-b
+          REPLAYED_WORKFLOW: langgraph-ci
+          REPLAYED_COMMIT: ${{ matrix.commit }}
+        run: ./scripts/ci/idempotency_diff.sh

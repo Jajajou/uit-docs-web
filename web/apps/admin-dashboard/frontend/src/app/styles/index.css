@@ -1,0 +1,345 @@
+@import "tailwindcss" source(none);
+@source "../../**/*.{ts,tsx}";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-outfit: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
+  --font-display: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
+  --font-body: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --text-title-sm: 1.875rem;
+  --text-title-sm--line-height: 2.375rem;
+  --text-theme-sm: 0.875rem;
+  --text-theme-sm--line-height: 1.25rem;
+  --text-theme-xs: 0.75rem;
+  --text-theme-xs--line-height: 1.125rem;
+
+  --color-white: #ffffff;
+  --color-black: #0f172a;
+
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dce6ff;
+  --color-brand-200: #bdceff;
+  --color-brand-300: #96afff;
+  --color-brand-400: #6689ff;
+  --color-brand-500: #4568ff;
+  --color-brand-600: #2f56f5;
+  --color-brand-700: #2444d1;
+  --color-brand-800: #2039aa;
+  --color-brand-900: #1d327f;
+  --color-brand-950: #13204d;
+
+  --color-gray-25: #fcfdff;
+  --color-gray-50: #f8fbff;
+  --color-gray-100: #e6edf7;
+  --color-gray-200: #d5deeb;
+  --color-gray-300: #afbdd1;
+  --color-gray-400: #6f7f96;
+  --color-gray-500: #526177;
+  --color-gray-600: #334155;
+  --color-gray-700: #1e293b;
+  --color-gray-800: #182235;
+  --color-gray-900: #0f172a;
+  --color-gray-dark: #0f172a;
+
+  --color-success-50: #f0fdf4;
+  --color-success-300: #86efac;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-950: #052e16;
+
+  --color-error-50: #fef2f2;
+  --color-error-200: #fecaca;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-950: #450a0a;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-200: #fde68a;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-950: #451a03;
+
+  --shadow-theme-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-theme-sm: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-theme-md: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --shadow-theme-lg: 0 24px 56px rgba(15, 23, 42, 0.1);
+  --shadow-theme-xl: 0 32px 80px rgba(15, 23, 42, 0.14);
+}
+
+.dark {
+  --color-brand-50: #e8f0ff;
+  --color-brand-100: #ceddff;
+  --color-brand-200: #a9c2ff;
+  --color-brand-300: #83a7ff;
+  --color-brand-400: #618dff;
+  --color-brand-500: #4572ff;
+  --color-brand-600: #3260ff;
+  --color-brand-700: #294dcb;
+  --color-brand-800: #1b337c;
+  --color-brand-900: #11214d;
+  --color-brand-950: #091124;
+
+  --color-gray-25: #eff7ff;
+  --color-gray-50: #dfeafb;
+  --color-gray-100: #c3d3ea;
+  --color-gray-200: #9db2d0;
+  --color-gray-300: #d2def1;
+  --color-gray-400: #9fb5d1;
+  --color-gray-500: #6f86a5;
+  --color-gray-600: #415877;
+  --color-gray-700: #203248;
+  --color-gray-800: #101d2e;
+  --color-gray-900: #091321;
+  --color-gray-950: #040b14;
+
+  --shadow-theme-xs: 0 8px 18px rgba(2, 8, 23, 0.18);
+  --shadow-theme-sm: 0 14px 34px rgba(2, 8, 23, 0.28);
+  --shadow-theme-md: 0 18px 44px rgba(2, 8, 23, 0.34);
+  --shadow-theme-lg: 0 26px 64px rgba(2, 8, 23, 0.42);
+  --shadow-theme-xl: 0 34px 88px rgba(2, 8, 23, 0.52);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  body {
+    font-family: "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
+    background:
+      radial-gradient(circle at top left, rgba(47, 86, 245, 0.08), transparent 24%),
+      linear-gradient(180deg, #f9fbff 0%, #f5f8fd 100%);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--color-gray-900);
+  }
+
+  ::selection {
+    background: rgba(47, 86, 245, 0.18);
+  }
+
+  table {
+    width: 100%;
+  }
+
+  thead {
+    background-color: rgba(239, 246, 255, 0.75);
+  }
+
+  th {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  td {
+    padding: 1rem;
+    font-size: 0.875rem;
+    color: var(--color-gray-700);
+    border-bottom: 1px solid rgba(213, 222, 235, 0.8);
+  }
+
+  input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--color-gray-200);
+    border-radius: 0.25rem;
+    cursor: pointer;
+    accent-color: var(--color-brand-500);
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.custom-scrollbar:hover {
+  scrollbar-color: var(--color-gray-300) transparent;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: var(--color-gray-400);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes subtleSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 86, 245, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 0 0 12px rgba(37, 99, 235, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.32s ease;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-subtle-slide-in {
+  animation: subtleSlideIn 0.45s ease-out;
+}
+
+.animate-soft-pulse {
+  animation: pulseGlow 2.1s ease-in-out infinite;
+}
+
+.surface-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark body {
+  background:
+    radial-gradient(circle at 16% 14%, rgba(56, 189, 248, 0.18), transparent 0 18%),
+    radial-gradient(circle at 82% 10%, rgba(37, 99, 235, 0.14), transparent 0 16%),
+    radial-gradient(circle at 50% 120%, rgba(29, 78, 216, 0.18), transparent 0 32%),
+    linear-gradient(180deg, #040a14 0%, #08111f 38%, #0a1526 100%);
+  color: #eff6ff;
+}
+
+.dark thead {
+  background-color: rgba(14, 29, 46, 0.88);
+}
+
+.dark th {
+  color: #9fb5d1;
+}
+
+.dark td {
+  color: #e6eefc;
+  border-bottom-color: rgba(91, 126, 167, 0.22);
+}
+
+.dark input[type="checkbox"] {
+  border-color: rgba(104, 149, 204, 0.48);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.dark .custom-scrollbar:hover {
+  scrollbar-color: rgba(94, 133, 184, 0.55) transparent;
+}
+
+.dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(94, 133, 184, 0.55);
+}
+
+.dark .surface-grid {
+  background-image:
+    radial-gradient(circle at center, rgba(96, 165, 250, 0.18) 0 1px, transparent 1.2px),
+    linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px, 24px 24px, 24px 24px;
+}
