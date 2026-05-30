@@ -16,7 +16,7 @@
 
 services:
   - type: web
-    name: uit-docs-backend
+    name: uit-docs-web
     runtime: docker
     plan: free
     region: singapore   # closest to UIT (HCMC). Free plan supported.

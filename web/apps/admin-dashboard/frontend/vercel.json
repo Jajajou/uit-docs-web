@@ -7,19 +7,19 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://uit-docs-backend.onrender.com/api/$1"
+      "destination": "https://uit-docs-web.onrender.com/api/$1"
     },
     {
       "source": "/healthz",
-      "destination": "https://uit-docs-backend.onrender.com/healthz"
+      "destination": "https://uit-docs-web.onrender.com/healthz"
     },
     {
       "source": "/health",
-      "destination": "https://uit-docs-backend.onrender.com/health"
+      "destination": "https://uit-docs-web.onrender.com/health"
     },
     {
       "source": "/metrics",
-      "destination": "https://uit-docs-backend.onrender.com/metrics"
+      "destination": "https://uit-docs-web.onrender.com/metrics"
     },
     {
       "source": "/(.*)",

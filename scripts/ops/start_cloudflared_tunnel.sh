@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # scripts/ops/start_cloudflared_tunnel.sh
 #
 # Expose the LangGraph upstream (which lives inside the Tailscale tailnet at
 # https://jajajou-bro.tail402a6.ts.net) over a public HTTPS endpoint so that
-# Render — which cannot join the tailnet — can call it.
+# Render â€” which cannot join the tailnet â€” can call it.
 #
 # This uses Cloudflare's "trycloudflare" quick-tunnel: no Cloudflare account
 # or domain required, the tunnel allocates a random https://*.trycloudflare.com
@@ -30,7 +30,7 @@
 #   The tunnel prints a line like
 #     INF |  https://something-random.trycloudflare.com
 #   Copy that URL and paste it into Render's environment variables for
-#   uit-docs-backend:
+#   uit-docs-web:
 #     LANGGRAPH_URL          = https://something-random.trycloudflare.com
 #     LANGGRAPH_PUBLIC_URL   = https://something-random.trycloudflare.com
 #     LANGGRAPH_UPSTREAM_URL = https://something-random.trycloudflare.com
@@ -74,7 +74,7 @@ fi
 echo "Starting Cloudflare quick-tunnel for ${UPSTREAM}..."
 echo "Look for the trycloudflare.com URL in the output below; copy it into"
 echo "the LANGGRAPH_URL / LANGGRAPH_PUBLIC_URL / LANGGRAPH_UPSTREAM_URL env"
-echo "vars on Render and redeploy uit-docs-backend."
+echo "vars on Render and redeploy uit-docs-web."
 echo
 
 # `--no-tls-verify` lets cloudflared accept the Tailscale upstream's

@@ -1,4 +1,4 @@
-# Staging deployment runbook — uit-docs-web
+﻿# Staging deployment runbook â€” uit-docs-web
 
 End-to-end checklist for bringing **Vercel frontend + Render backend** online
 against `Jajajou/uit-docs-web/web_implement_split` on free tiers (no credit
@@ -29,7 +29,7 @@ The free tier knobs you should know about up front:
 * `trycloudflare.com` URLs are randomised every time the tunnel restarts.
   Re-paste the new URL into Render whenever you restart cloudflared.
 
-## Phase 4a — Provision Neon Postgres
+## Phase 4a â€” Provision Neon Postgres
 
 1. Sign up at https://neon.tech (Google sign-in is fine).
 2. Create a new project named `uit-docs` in `Asia/Singapore`.
@@ -46,7 +46,7 @@ The free tier knobs you should know about up front:
 4. Save the connection string in your password manager. You will paste it
    into Render twice (`WORKSPACE_DATABASE_URL` and `DATABASE_URL`).
 
-## Phase 4b — Run the Cloudflare Tunnel locally
+## Phase 4b â€” Run the Cloudflare Tunnel locally
 
 1. Install cloudflared on the machine that is **already joined to the
    Tailscale tailnet** (typically your laptop):
@@ -76,21 +76,21 @@ The free tier knobs you should know about up front:
    INF |  https://something-random.trycloudflare.com
    ```
 
-   Copy that URL — it is your `LANGGRAPH_URL` for Render.
+   Copy that URL â€” it is your `LANGGRAPH_URL` for Render.
 
 4. Leave this terminal running. The tunnel only stays up while
    cloudflared is alive. If you reboot or kill the process, restart
    the script and re-paste the new URL into Render.
 
-## Phase 4c — Deploy the Render backend
+## Phase 4c â€” Deploy the Render backend
 
-### Option A — Blueprint (recommended, IaC)
+### Option A â€” Blueprint (recommended, IaC)
 
 1. In the Render dashboard click **New -> Blueprint**.
 2. Connect the GitHub repo `Jajajou/uit-docs-web`.
 3. Pick branch **`web_implement_split`**.
 4. Render reads `render.yaml` at the repo root and proposes
-   `uit-docs-backend` with the Dockerfile at
+   `uit-docs-web` with the Dockerfile at
    `web/apps/admin-dashboard/backend/Dockerfile`.
 5. Click **Apply**. The build runs (5-8 min on the free tier).
 6. While the build runs, open the service page and add the secrets that
@@ -108,12 +108,12 @@ The free tier knobs you should know about up front:
    | `LIGHTRAG_URL`            | leave empty for staging (live ingestion stays off)                     |
    | `CORS_ORIGINS`            | `https://uit-docs-web.vercel.app,https://*.vercel.app`                 |
    | `CORS_ALLOWED_ORIGINS`    | same as `CORS_ORIGINS`                                                 |
-   | `TRUSTED_HOSTS`           | `uit-docs-backend.onrender.com,uit-docs-web.vercel.app,localhost,127.0.0.1` |
+   | `TRUSTED_HOSTS`           | `uit-docs-web.onrender.com,uit-docs-web.vercel.app,localhost,127.0.0.1` |
    | `SESSION_COOKIE_DOMAIN`   | leave empty (Render gives you a `*.onrender.com` host that the SPA on Vercel proxies through) |
    | `SSO_CLIENT_ID`           | leave empty (`ENABLE_DEMO_AUTH=true` covers staging logins)            |
    | `SSO_CLIENT_SECRET`       | leave empty                                                            |
    | `SSO_HOSTED_DOMAIN`       | `gm.uit.edu.vn`                                                        |
-   | `SSO_CALLBACK_BASE_URL`   | `https://uit-docs-backend.onrender.com`                                |
+   | `SSO_CALLBACK_BASE_URL`   | `https://uit-docs-web.onrender.com`                                |
    | `SSO_FRONTEND_BASE_URL`   | `https://uit-docs-web.vercel.app`                                      |
    | `SSO_GROUP_ROLE_MAP`      | leave empty                                                            |
    | `GOOGLE_OAUTH_CLIENT_ID`  | leave empty (alias for `SSO_CLIENT_ID`)                                |
@@ -131,7 +131,7 @@ The free tier knobs you should know about up front:
    then `uvicorn api.main:app`. Watch the logs until `Application startup
    complete` appears.
 
-### Option B — Manual (skip if Blueprint worked)
+### Option B â€” Manual (skip if Blueprint worked)
 
 1. **New -> Web Service**, connect the same repo.
 2. Pick branch `web_implement_split`.
@@ -148,7 +148,7 @@ The free tier knobs you should know about up front:
 Once Render reports the service is *Live*:
 
 ```sh
-BACKEND="https://uit-docs-backend.onrender.com"
+BACKEND="https://uit-docs-web.onrender.com"
 
 # 1. Liveness probes
 curl -fsS "${BACKEND}/health"   # legacy: {"status":"healthy", ...}
@@ -163,7 +163,7 @@ curl -fsS \
   -H 'x-request-id: smoke-001' \
   "${BACKEND}/api/chat/sessions" | jq .
 
-# 4. Streaming chat — confirm the BFF reaches LangGraph through the tunnel
+# 4. Streaming chat â€” confirm the BFF reaches LangGraph through the tunnel
 #    (returns 200 with a JSON envelope; the live LangGraph stream surfaces
 #    via SSE inside the response body)
 curl -fsS -N \
@@ -176,9 +176,9 @@ curl -fsS -N \
 ```
 
 If `/api/chat/stream` returns 502, the LangGraph upstream is unreachable
-from Render — re-check the Cloudflare Tunnel URL.
+from Render â€” re-check the Cloudflare Tunnel URL.
 
-## Phase 3 — Deploy the Vercel frontend
+## Phase 3 â€” Deploy the Vercel frontend
 
 1. Open https://vercel.com/new.
 2. Click **Import Project** and pick `Jajajou/uit-docs-web`.
@@ -188,31 +188,31 @@ from Render — re-check the Cloudflare Tunnel URL.
    * Root directory: `web/apps/admin-dashboard/frontend`.
    * Build command: `npm run build` (auto).
    * Output directory: `dist` (auto).
-5. Environment variables — leave **`VITE_API_BASE_URL`** UNSET. The SPA
+5. Environment variables â€” leave **`VITE_API_BASE_URL`** UNSET. The SPA
    falls back to `/api`, which `vercel.json` rewrites onto the Render
    backend so the browser sees the same origin and CORS preflights are
    skipped entirely.
 
    The only var worth setting in Production is:
-   * `VITE_ENABLE_MOCKS` — leave UNSET in staging/prod (default: live API).
+   * `VITE_ENABLE_MOCKS` â€” leave UNSET in staging/prod (default: live API).
 
 6. Click **Deploy**. Vercel runs `npm ci` + `npm run build`. The first
    build takes ~3 min on the free tier.
-7. Once the deployment is *Ready*, copy the production URL — it is
+7. Once the deployment is *Ready*, copy the production URL â€” it is
    either `https://uit-docs-web.vercel.app` (the canonical alias) or a
    `*-jajajou.vercel.app` deployment-specific URL. Set the canonical
    alias under **Settings -> Domains** if you have not already.
 8. **Update Render**: paste the canonical Vercel URL into the
    `CORS_ORIGINS`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_HOSTS`, and
    `SSO_FRONTEND_BASE_URL` env vars on Render, then redeploy
-   uit-docs-backend so the trusted-host middleware accepts the new
+   uit-docs-web so the trusted-host middleware accepts the new
    origin.
 
 ### Frontend smoke test
 
 ```sh
 FRONTEND="https://uit-docs-web.vercel.app"
-BACKEND="https://uit-docs-backend.onrender.com"
+BACKEND="https://uit-docs-web.onrender.com"
 
 # 1. SPA loads
 curl -fsS "${FRONTEND}/" | grep -q '<div id="root"></div>' && echo "OK: SPA shell"
@@ -231,23 +231,23 @@ In the browser:
 
 1. Visit `${FRONTEND}/`. The shell should render with no console errors.
 2. Click **Log in with demo account** (staging has `ENABLE_DEMO_AUTH=true`)
-   — the SPA hits `/api/auth/login/demo` which Vercel proxies onto Render.
+   â€” the SPA hits `/api/auth/login/demo` which Vercel proxies onto Render.
 3. Open the chat panel and send a message. The first request streams
    from `/api/student/runs/stream` -> Render -> Cloudflare Tunnel ->
    LangGraph and returns within 30 s when warm.
 
-## Phase 5 — Keep-warm cron
+## Phase 5 â€” Keep-warm cron
 
 Render's free tier sleeps after 15 min idle. Use cron-job.org:
 
 1. Sign up at https://cron-job.org (free, no credit card).
 2. New cronjob:
-   * URL: `https://uit-docs-backend.onrender.com/health`
+   * URL: `https://uit-docs-web.onrender.com/health`
    * Schedule: every 10 minutes
    * Notifications: e-mail on failure
 3. Save. The first ping wakes the dyno; subsequent pings keep it warm.
 
-## Phase 6 — Trigger CI workflows so branch protection becomes available
+## Phase 6 â€” Trigger CI workflows so branch protection becomes available
 
 GitHub Actions check names only appear in the branch protection picker
 *after* the workflows have run at least once. To register
@@ -280,7 +280,7 @@ GitHub Actions check names only appear in the branch protection picker
 * **Backend**: in Render, **Manual Deploy -> Deploys**, click the
   `Rollback` action on a known-good earlier deploy. Render recreates the
   container from the previous image. Database migrations are **not**
-  rolled back automatically — if you bumped a schema, run
+  rolled back automatically â€” if you bumped a schema, run
   `alembic downgrade <prev>` over Render's shell first.
 
 ## Troubleshooting cheat-sheet
