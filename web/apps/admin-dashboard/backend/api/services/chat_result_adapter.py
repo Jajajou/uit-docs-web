@@ -55,6 +55,41 @@ def _normalize_response_text(result: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_interrupt_payload(result: dict[str, Any]) -> dict[str, Any] | None:
+    raw_interrupts = result.get("__interrupt__") or result.get("interrupts") or result.get("interrupt")
+    if isinstance(raw_interrupts, dict):
+        raw_interrupts = [raw_interrupts]
+    if not isinstance(raw_interrupts, list):
+        return None
+
+    for item in raw_interrupts:
+        if not isinstance(item, dict):
+            continue
+        value = item.get("value", item)
+        if isinstance(value, dict):
+            return value
+
+    return None
+
+
+def _normalize_interrupt_text(result: dict[str, Any]) -> str:
+    interrupt = _extract_interrupt_payload(result)
+    if not interrupt:
+        return ""
+
+    message = str(interrupt.get("message") or "").strip()
+    if message:
+        return message
+
+    missing_fields = interrupt.get("missing_fields")
+    if isinstance(missing_fields, list):
+        fields = ", ".join(str(field).strip() for field in missing_fields if str(field).strip())
+        if fields:
+            return f"Vui lòng cung cấp thêm thông tin: {fields}."
+
+    return ""
+
+
 def _extract_markdown_references(response_text: str) -> list[dict[str, Any]]:
     if not response_text:
         return []
@@ -106,7 +141,12 @@ def _normalize_response_type(
     result: dict[str, Any],
     response_text: str,
     references: list[dict[str, Any]],
+    *,
+    has_interrupt: bool = False,
 ) -> NormalizedResponseType:
+    if has_interrupt:
+        return "partial_answer"
+
     raw_response_type = result.get("response_type")
     if raw_response_type is None:
         confidence_summary = result.get("confidence_summary")
@@ -130,9 +170,11 @@ def _detect_no_context(response_text: str) -> bool:
 
 def normalize_chat_result(result: dict[str, Any] | None) -> NormalizedChatResult:
     payload = result if isinstance(result, dict) else {}
-    response_text = _normalize_response_text(payload)
+    interrupt_text = _normalize_interrupt_text(payload)
+    response_text = _normalize_response_text(payload) or interrupt_text
+    has_interrupt = bool(interrupt_text)
     references = _normalize_references(payload, response_text)
-    response_type = _normalize_response_type(payload, response_text, references)
+    response_type = _normalize_response_type(payload, response_text, references, has_interrupt=has_interrupt)
     confidence_summary = payload.get("confidence_summary")
     normalized_confidence_summary = confidence_summary if isinstance(confidence_summary, dict) else {}
     return NormalizedChatResult(
@@ -140,5 +182,5 @@ def normalize_chat_result(result: dict[str, Any] | None) -> NormalizedChatResult
         response_type=response_type,
         references=references,
         confidence_summary=normalized_confidence_summary,
-        no_context=_detect_no_context(response_text),
+        no_context=False if has_interrupt else _detect_no_context(response_text),
     )
